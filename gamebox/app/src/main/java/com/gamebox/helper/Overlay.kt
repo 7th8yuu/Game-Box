@@ -7,6 +7,7 @@ import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.os.IBinder
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
@@ -67,10 +68,23 @@ class Cross(c: Context) : View(c) {
     }
 }
 
+// Vòng tròn điểm chạm của Macro: kéo để đặt vị trí, lúc chạy thì không nhận chạm
+class Tgt(c: Context) : View(c) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4f; color = Color.rgb(250, 204, 21) }
+    override fun onDraw(c: Canvas) {
+        val r = minOf(width, height) / 2f - 4f
+        c.drawCircle(width / 2f, height / 2f, r, p)
+        c.drawCircle(width / 2f, height / 2f, 4f, p)
+    }
+}
+
 class Overlay : Service() {
     private lateinit var wm: WindowManager
     private lateinit var box: LinearLayout
     private var cross: View? = null
+    private var tgt: Tgt? = null
+    private var tlp: WindowManager.LayoutParams? = null
+    @Volatile private var macroOn = false
     @Volatile private var run = true
 
     override fun onBind(i: Intent?): IBinder? = null
@@ -97,6 +111,44 @@ class Overlay : Service() {
             val v = hzs[hi]; thread { Rt.sh("settings put system peak_refresh_rate $v", "settings put system min_refresh_rate $v") }
         }
         hex("🚀", "Turbo") { it.on = !it.on; it.invalidate(); val v = it.on; thread { Rt.mode(if (v) 1 else 0) } }
+        var ms = 0 // Macro: 0 tắt, 1 đặt điểm chạm, 2 đang chạm liên tục
+        hex("🔁", "Macro") {
+            ms = (ms + 1) % 3
+            when (ms) {
+                1 -> {
+                    val t = Tgt(this)
+                    val l = WindowManager.LayoutParams(
+                        dp(56), dp(56), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT
+                    ).apply { gravity = Gravity.TOP or Gravity.START; x = dp(300); y = dp(120) }
+                    t.setOnTouchListener { _, e ->
+                        l.x = (e.rawX - dp(28)).toInt(); l.y = (e.rawY - dp(28)).toInt()
+                        runCatching { wm.updateViewLayout(t, l) }
+                        true
+                    }
+                    wm.addView(t, l); tgt = t; tlp = l
+                    it.lb = "Đặt điểm"; it.on = true
+                }
+                2 -> {
+                    val t = tgt; val l = tlp
+                    if (t != null && l != null) {
+                        l.flags = l.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        runCatching { wm.updateViewLayout(t, l) }
+                        val cx = l.x + dp(28); val cy = l.y + dp(28)
+                        macroOn = true
+                        thread { while (macroOn && run) { Rt.sh("input tap $cx $cy"); Thread.sleep(120) } }
+                    }
+                    it.lb = "Đang chạy"; it.on = true
+                }
+                else -> {
+                    macroOn = false
+                    tgt?.let { v -> runCatching { wm.removeView(v) } }
+                    tgt = null; tlp = null
+                    it.lb = "Macro"; it.on = false
+                }
+            }
+            it.invalidate()
+        }
         hex("🎯", "Tâm ngắm") {
             it.on = !it.on; it.invalidate()
             if (it.on) {
@@ -151,8 +203,9 @@ class Overlay : Service() {
     }
 
     override fun onDestroy() {
-        run = false
+        run = false; macroOn = false
         cross?.let { v -> runCatching { wm.removeView(v) } }
+        tgt?.let { v -> runCatching { wm.removeView(v) } }
         runCatching { wm.removeView(box) }
     }
 }

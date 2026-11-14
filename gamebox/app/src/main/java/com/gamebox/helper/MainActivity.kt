@@ -8,7 +8,13 @@ import android.content.pm.ApplicationInfo
 import android.os.BatteryManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.zIndex
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.*
 import androidx.compose.foundation.Canvas
@@ -144,6 +150,78 @@ fun Rail(page: Int, set: (Int) -> Unit, power: () -> Unit) {
     }
 }
 
+// Màn Kết cấu: kéo thanh để so sánh trước/sau. Mức kết cấu thực chất là độ phân giải render của game
+// (cmd game --downscale), bản xem trước chỉ mô phỏng bằng cách làm vỡ ảnh biểu tượng game.
+@Composable
+fun TexScreen(name: String, icon: ImageBitmap?, res: Int, onSave: (Int) -> Unit, onClose: () -> Unit) {
+    val levels = listOf(100, 85, 70, 60, 50)
+    val names = listOf("Gốc", "Nhẹ", "Retro", "Khối", "Cực đại")
+    val grid = listOf(192, 96, 48, 24, 12)
+    var lvl by remember { mutableIntStateOf(levels.indices.minByOrNull { kotlin.math.abs(levels[it] - res) } ?: 0) }
+    var on by remember { mutableStateOf(true) }
+    var pos by remember { mutableFloatStateOf(.5f) }
+    val after = remember(icon, lvl) {
+        icon?.let {
+            val small = android.graphics.Bitmap.createScaledBitmap(it.asAndroidBitmap(), grid[lvl], grid[lvl], true)
+            android.graphics.Bitmap.createScaledBitmap(small, 192, 192, false).asImageBitmap()
+        }
+    }
+    val tag = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(.55f)).padding(horizontal = 10.dp, vertical = 4.dp)
+    Box(Modifier.fillMaxSize().zIndex(1f).background(Color(0xF2080E14)).clickable { }) {
+        Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.08f)).clickable { onClose() }, contentAlignment = Alignment.Center) { Text("←", fontSize = 20.sp) }
+                    Text("Kết cấu", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+                Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, Color.White.copy(.2f), RoundedCornerShape(20.dp))) {
+                    if (icon != null && after != null) {
+                        Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
+                            detectHorizontalDragGestures { change, _ -> pos = (change.position.x / size.width).coerceIn(0f, 1f) }
+                        }) {
+                            val w = size.width.toInt(); val h = size.height.toInt()
+                            drawImage(icon, dstSize = IntSize(w, h), filterQuality = FilterQuality.None)
+                            clipRect(left = size.width * pos) { drawImage(after, dstSize = IntSize(w, h), filterQuality = FilterQuality.None) }
+                            drawLine(Color.White, Offset(size.width * pos, 0f), Offset(size.width * pos, size.height), strokeWidth = 2.dp.toPx())
+                            drawCircle(Color.White, 16.dp.toPx(), Offset(size.width * pos, size.height / 2))
+                        }
+                    }
+                    Text("TRƯỚC", tag.align(Alignment.TopStart).padding(10.dp), fontSize = 10.sp, letterSpacing = 2.sp)
+                    Text("SAU", tag.align(Alignment.TopEnd).padding(10.dp), fontSize = 10.sp, letterSpacing = 2.sp)
+                }
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.White.copy(.06f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (icon != null) Image(icon, null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(name, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text("Bật cho $name", fontSize = 12.sp, color = Color.White.copy(.65f))
+                    }
+                    Switch(on, { on = it })
+                }
+            }
+            Column(Modifier.weight(1.3f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Lbl("CÀI NHANH")
+                Seg(names, lvl, Modifier.fillMaxWidth()) { lvl = it }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Chi tiết kết cấu", Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                    Text(names[lvl], color = Cy, fontWeight = FontWeight.Bold)
+                }
+                Slider(lvl.toFloat(), { lvl = it.roundToInt() }, valueRange = 0f..4f, steps = 3)
+                Text("Độ phân giải render của game: ${levels[lvl]}%", fontSize = 13.sp, color = Color.White.copy(.8f))
+                Text("Đổi khi đang chơi? Hãy đóng game rồi mở lại.", fontSize = 12.sp, color = Color.White.copy(.65f))
+                Text("Mức càng cao game càng nhẹ nhưng hình càng vỡ. Bản xem trước chỉ mô phỏng, cần Android 13+ để áp dụng.", fontSize = 12.sp, color = Color.White.copy(.65f))
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton({ lvl = 0 }) { Text("Đặt lại gốc") }
+                    Button({ onSave(if (on) levels[lvl] else 100) }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Cy, contentColor = Color(0xFF06121C))) {
+                        Text("Lưu", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun App(sp: SharedPreferences) {
     val ctx = LocalContext.current
@@ -178,6 +256,8 @@ fun App(sp: SharedPreferences) {
     var msg by remember { mutableStateOf("") }
     var procs by remember { mutableStateOf(listOf<Proc>()) }
     var menu by remember { mutableStateOf(false) }
+    var tex by remember { mutableStateOf(false) }
+    BackHandler(enabled = tex) { tex = false }
     val hist = remember { List(4) { mutableStateListOf<Int>() } }
     val temps = remember { mutableStateListOf<Float>() }
 
@@ -215,6 +295,7 @@ fun App(sp: SharedPreferences) {
         thread { Rt.restore(p); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
     }
     val selName = games.firstOrNull { it.packageName == sel }?.let { pm.getApplicationLabel(it).toString() } ?: "Chơi"
+    val selIcon = remember(sel) { runCatching { pm.getApplicationIcon(sel).toBitmap(192, 192).asImageBitmap() }.getOrNull() }
     val b = bat
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Cy, background = Bg, surface = Bg, onBackground = Color.White, onSurface = Color.White)) {
@@ -224,6 +305,7 @@ fun App(sp: SharedPreferences) {
                     Box(Modifier.align(Alignment.TopEnd).offset(60.dp, (-40).dp).size(300.dp).background(Color(0xFF8A5A1E).copy(.45f), CircleShape).blur(80.dp))
                     Box(Modifier.align(Alignment.BottomStart).offset((-40).dp, 60.dp).size(280.dp).background(Cy.copy(.25f), CircleShape).blur(80.dp))
                 }
+                if (tex) TexScreen(selName, selIcon, g("res", 100), { s("res", it); tex = false }, { tex = false })
                 Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                     Rail(page, { page = it }, { power() })
                     Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 18.dp, vertical = 10.dp)) {
@@ -283,6 +365,8 @@ fun App(sp: SharedPreferences) {
                                         Stat("PING DNS", if (ping < 0) "-" else "$ping ms")
                                         Stat("PIN", "${b?.lv ?: 0}%")
                                         Spacer(Modifier.weight(1f))
+                                        OutlinedButton({ tex = true }) { Text("Kết cấu", color = Cy) }
+                                        Spacer(Modifier.width(10.dp))
                                         Button({ play() }, colors = ButtonDefaults.buttonColors(containerColor = Cy, contentColor = Color(0xFF06121C))) {
                                             Text("▶  $selName", fontWeight = FontWeight.Bold)
                                         }
