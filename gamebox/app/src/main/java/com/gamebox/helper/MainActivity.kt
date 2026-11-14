@@ -45,7 +45,9 @@ import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
-val Cy = Color(0xFF7DD3FC)
+// Màu nhấn của giao diện, đổi được trong trang Đồ họa và lưu trong SharedPreferences
+val Themes = listOf(Color(0xFF7DD3FC), Color(0xFF4ADE80), Color(0xFFFBBF24), Color(0xFFF472B6), Color(0xFFA78BFA), Color(0xFFFB7185))
+var Cy by mutableStateOf(Themes[0])
 val Bg = Color(0xFF0A1118)
 
 class Bat(val lv: Int, val t: Float, val mv: Int, val ma: Int, val health: Int, val plug: Int)
@@ -69,7 +71,9 @@ class MainActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        setContent { App(getSharedPreferences("gs", Context.MODE_PRIVATE)) }
+        val sp = getSharedPreferences("gs", Context.MODE_PRIVATE)
+        Cy = Themes[sp.getInt("theme", 0).coerceIn(0, Themes.lastIndex)]
+        setContent { App(sp) }
     }
 }
 
@@ -200,7 +204,8 @@ fun App(sp: SharedPreferences) {
         Rt.pkg = p
         val gm = g("gm", 0); val res = g("res", 100); val fps = listOf(30, 45, 60, 90, 120, 0)[g("fps", 5)]
         val hzv = listOf(0, 60, 90, 120, 144)[g("hz", 0)]; val sat = g("sat", 100) / 100f
-        thread { Rt.applyGame(p, gm, res, fps, hzv, sat); Rt.mode(gm); if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean() }
+        val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
+        thread { Rt.applyGame(p, gm, res, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv); if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean() }
         if (ov) ctx.startForegroundService(Intent(ctx, Overlay::class.java))
         pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
     }
@@ -236,7 +241,7 @@ fun App(sp: SharedPreferences) {
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 OutlinedButton({
-                                    listOf("hz", "sat", "res", "fps", "gm").forEach { sp.edit().remove("${it}_$sel").apply(); cfg.remove("${it}_$sel") }
+                                    listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").forEach { sp.edit().remove("${it}_$sel").apply(); cfg.remove("${it}_$sel") }
                                 }) { Text("Đặt lại mặc định") }
                                 Spacer(Modifier.width(8.dp))
                             }
@@ -399,6 +404,17 @@ fun App(sp: SharedPreferences) {
                                     Spacer(Modifier.height(4.dp))
                                     Text("Giới hạn FPS", fontWeight = FontWeight.Medium)
                                     Seg(listOf("30", "45", "60", "90", "120", "Tối đa"), g("fps", 5), Modifier.fillMaxWidth()) { s("fps", it) }
+                                    Spacer(Modifier.height(12.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text("Khử răng cưa 4x MSAA", fontWeight = FontWeight.Medium)
+                                            Text("Áp dụng sau khi khởi động lại game", fontSize = 12.sp, color = Color.White.copy(.65f))
+                                        }
+                                        Switch(g("msaa", 0) == 1, { s("msaa", if (it) 1 else 0) })
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Driver đồ họa", fontWeight = FontWeight.Medium)
+                                    Seg(listOf("Mặc định", "Game Driver", "Vulkan"), g("drv", 0), Modifier.fillMaxWidth()) { s("drv", it) }
                                 }
                                 GCard(hz, Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                                     Text("Chế độ game", fontWeight = FontWeight.Medium)
@@ -413,6 +429,20 @@ fun App(sp: SharedPreferences) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("Bảng điều khiển trong game", Modifier.weight(1f))
                                         Switch(ov, { ov = it; sp.edit().putBoolean("ov", it).apply(); if (!it) ctx.stopService(Intent(ctx, Overlay::class.java)) })
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Hiệu ứng hệ thống", fontWeight = FontWeight.Medium)
+                                    Seg(listOf("Bình thường", "Nhanh", "Tắt"), g("anim", 0), Modifier.fillMaxWidth()) { s("anim", it) }
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Màu giao diện", fontWeight = FontWeight.Medium)
+                                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Themes.forEachIndexed { i, c ->
+                                            Box(
+                                                Modifier.size(30.dp).clip(CircleShape).background(c)
+                                                    .border(if (Cy == c) 2.dp else 0.dp, Color.White, CircleShape)
+                                                    .clickable { Cy = c; sp.edit().putInt("theme", i).apply() }
+                                            )
+                                        }
                                     }
                                     Spacer(Modifier.height(8.dp))
                                     Text("Mọi cài đặt được khôi phục khi bạn thoát game (nút ✕).", fontSize = 12.sp, color = Color.White.copy(.55f))

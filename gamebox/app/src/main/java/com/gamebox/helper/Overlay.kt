@@ -58,9 +58,19 @@ class Hex(c: Context, val ic: String, var lb: String, val tap: (Hex) -> Unit) : 
     }
 }
 
+// Chấm tâm ngắm đặt giữa màn hình, không nhận chạm
+class Cross(c: Context) : View(c) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 59, 48) }
+    override fun onDraw(c: Canvas) {
+        val d = resources.displayMetrics.density
+        c.drawCircle(width / 2f, height / 2f, 3 * d, p)
+    }
+}
+
 class Overlay : Service() {
     private lateinit var wm: WindowManager
     private lateinit var box: LinearLayout
+    private var cross: View? = null
     @Volatile private var run = true
 
     override fun onBind(i: Intent?): IBinder? = null
@@ -76,8 +86,9 @@ class Overlay : Service() {
         }
         val info = TextView(this).apply { setTextColor(Color.WHITE); textSize = 12f; typeface = Typeface.MONOSPACE }
         val ch = Chart(this)
-        val grid = android.widget.GridLayout(this).apply { columnCount = 4 }
+        val grid = android.widget.GridLayout(this).apply { columnCount = 6 }
         val hzs = intArrayOf(60, 90, 120); var hi = 0
+        val sens = intArrayOf(0, 3, 5, 7); var si = 0
         fun hex(ic: String, lb: String, tap: (Hex) -> Unit) { grid.addView(Hex(this, ic, lb, tap)) }
         hex("🧹", "Dọn RAM") { thread { Rt.clean() } }
         hex("🔕", "Chặn noti") { it.on = !it.on; it.invalidate(); val v = it.on; thread { Rt.dnd(v) } }
@@ -85,14 +96,34 @@ class Overlay : Service() {
             hi = (hi + 1) % 3; it.lb = "Quét ${hzs[hi]}Hz"; it.on = true; it.invalidate()
             val v = hzs[hi]; thread { Rt.sh("settings put system peak_refresh_rate $v", "settings put system min_refresh_rate $v") }
         }
-        hex("📸", "Chụp MH") { thread { Rt.sh("screencap -p /sdcard/Pictures/GameBox_${System.currentTimeMillis()}.png") } }
         hex("🚀", "Turbo") { it.on = !it.on; it.invalidate(); val v = it.on; thread { Rt.mode(if (v) 1 else 0) } }
+        hex("🎯", "Tâm ngắm") {
+            it.on = !it.on; it.invalidate()
+            if (it.on) {
+                val v = Cross(this)
+                val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                wm.addView(v, WindowManager.LayoutParams(dp(24), dp(24), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.CENTER })
+                cross = v
+            } else {
+                cross?.let { v -> runCatching { wm.removeView(v) } }
+                cross = null
+            }
+        }
+        hex("🎚", "Độ nhạy") {
+            si = (si + 1) % sens.size; it.lb = if (si == 0) "Độ nhạy" else "Nhạy ${sens[si]}"; it.on = si != 0; it.invalidate()
+            val v = sens[si]; thread { Rt.pointer(v) }
+        }
+        hex("📸", "Chụp MH") { thread { Rt.sh("screencap -p /sdcard/Pictures/GameBox_${System.currentTimeMillis()}.png") } }
+        hex("🎥", "Quay MH") {
+            it.on = !it.on; it.lb = if (it.on) "Đang quay" else "Quay MH"; it.invalidate()
+            val v = it.on; thread { Rt.record(v) }
+        }
         hex("👆", "Hiện chạm") { it.on = !it.on; it.invalidate(); val v = if (it.on) 1 else 0; thread { Rt.sh("settings put system show_touches $v") } }
         hex("🏠", "Về app") { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         hex("✕", "Thoát") { val p = Rt.pkg; Rt.pkg = ""; thread { Rt.restore(p); Rt.mode(0); Rt.dnd(false) }; stopSelf() }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(14), dp(10)); background = bg(); visibility = View.GONE
-            addView(info); addView(ch, LinearLayout.LayoutParams(dp(280), dp(40))); addView(grid)
+            addView(info); addView(ch, LinearLayout.LayoutParams(dp(420), dp(40))); addView(grid)
         }
         val pill = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 12f; setPadding(dp(14), dp(6), dp(14), dp(6)); background = bg()
@@ -119,5 +150,9 @@ class Overlay : Service() {
         }
     }
 
-    override fun onDestroy() { run = false; runCatching { wm.removeView(box) } }
+    override fun onDestroy() {
+        run = false
+        cross?.let { v -> runCatching { wm.removeView(v) } }
+        runCatching { wm.removeView(box) }
+    }
 }

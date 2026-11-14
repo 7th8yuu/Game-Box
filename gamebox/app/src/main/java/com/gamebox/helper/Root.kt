@@ -65,6 +65,29 @@ object Rt {
     fun saver(on: Boolean) { sh("settings put global low_power ${if (on) 1 else 0}") }
     fun dnd(on: Boolean) { sh("cmd notification set_dnd ${if (on) "on" else "off"}") }
 
+    // Hiệu ứng hệ thống: 0 bình thường (1x), 1 nhanh (0.5x), 2 tắt
+    fun anim(m: Int) {
+        val v = arrayOf("1.0", "0.5", "0")[m.coerceIn(0, 2)]
+        sh("settings put global window_animation_scale $v", "settings put global transition_animation_scale $v", "settings put global animator_duration_scale $v")
+    }
+
+    // Khử răng cưa 4x MSAA (như tùy chọn nhà phát triển; áp dụng sau khi mở lại game)
+    fun msaa(on: Boolean) { sh("setprop debug.egl.force_msaa $on") }
+
+    // Driver đồ họa: 0 mặc định, 1 game driver, 2 Vulkan cho giao diện hệ thống
+    fun driver(m: Int) {
+        sh("settings put global game_driver_all_apps ${if (m == 1) 1 else 0}", "setprop debug.hwui.renderer ${if (m == 2) "skiavk" else "''"}")
+    }
+
+    // Tốc độ con trỏ -7..7. Android không có chỉnh độ nhạy cảm ứng chung, chỉ có tác dụng với chuột/tay cầm
+    fun pointer(v: Int) { sh("settings put system pointer_speed $v") }
+
+    // Quay màn hình tối đa 3 phút, lưu vào /sdcard/Movies. Chạy nền để lệnh dừng không bị chờ
+    fun record(on: Boolean) {
+        if (on) sh("mkdir -p /sdcard/Movies", "nohup screenrecord --time-limit 180 /sdcard/Movies/GameBox_${System.currentTimeMillis()}.mp4 >/dev/null 2>&1 &")
+        else sh("pkill -2 screenrecord")
+    }
+
     // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res %, fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc
     fun applyGame(p: String, gm: Int, res: Int, fps: Int, hz: Int, sat: Float) {
         val mode = arrayOf("standard", "performance", "battery")[gm]
@@ -77,6 +100,7 @@ object Rt {
 
     fun restore(p: String) {
         sh("cmd game reset $p", "settings delete system peak_refresh_rate", "settings delete system min_refresh_rate", "service call SurfaceFlinger 1022 f 1.0")
+        anim(0); msaa(false); driver(0); pointer(0); record(false)
     }
 
     fun clean(): String {
