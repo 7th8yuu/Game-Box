@@ -72,7 +72,9 @@ fun f1(x: Double): String = String.format(Locale.US, "%.1f", x)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
-        super.onCreate(b); enableEdgeToEdge()
+        super.onCreate(b)
+        if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
+        enableEdgeToEdge()
         WindowCompat.getInsetsController(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

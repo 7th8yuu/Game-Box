@@ -17,3 +17,32 @@ jobs:
         with:
           name: GameBox-debug
           path: gamebox/app/build/outputs/apk/debug/*.apk
+  # Mở app trên emulator (không root) và in logcat nếu crash. Không làm đỏ cả lần chạy.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 25
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: GameBox-debug, path: apk }
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          script: |
+            adb install -r apk/app-debug.apk
+            adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW allow
+            adb logcat -c
+            adb shell am start -W -n com.gamebox.helper/.MainActivity
+            sleep 20
+            adb logcat -d -t 3000 > smoke.log
+            adb shell pidof com.gamebox.helper || echo "APP NOT RUNNING"
+            grep -E -A45 "FATAL EXCEPTION" smoke.log || echo "NO FATAL EXCEPTION"
+            adb shell run-as com.gamebox.helper cat files/crash.txt || echo "NO crash.txt"
