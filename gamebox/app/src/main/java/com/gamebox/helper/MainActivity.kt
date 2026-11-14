@@ -91,7 +91,7 @@ fun GCard(hz: HazeState, mod: Modifier = Modifier, content: @Composable ColumnSc
     val s = RoundedCornerShape(24.dp)
     Column(
         mod.clip(s)
-            .hazeEffect(hz) { blurRadius = 24.dp; tints = listOf(HazeTint(Color(0xFF0C1620).copy(.55f))) }
+            .hazeEffect(hz) { backgroundColor = Bg; blurRadius = 24.dp; tints = listOf(HazeTint(Color(0xFF0C1620).copy(.55f))) }
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(.35f), Color.White.copy(.05f), Color.White.copy(.15f))), s)
             .padding(14.dp),
         content = content
