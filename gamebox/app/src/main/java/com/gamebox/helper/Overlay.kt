@@ -93,6 +93,8 @@ class Overlay : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("o", "Overlay", NotificationManager.IMPORTANCE_MIN))
         startForeground(1, Notification.Builder(this, "o").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Game Box").build())
         wm = getSystemService(WindowManager::class.java)
+        // Chưa có quyền "hiển thị trên ứng dụng khác" thì addView sẽ ném BadTokenException, nên dừng sớm
+        if (!android.provider.Settings.canDrawOverlays(this)) { stopSelf(); return }
         val d = resources.displayMetrics.density
         fun dp(v: Int) = (v * d).toInt()
         fun bg() = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.argb(205, 16, 44, 72), Color.argb(185, 8, 18, 32))).apply {
@@ -187,7 +189,7 @@ class Overlay : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; y = dp(6) }
-        wm.addView(box, lp)
+        try { wm.addView(box, lp) } catch (e: Exception) { stopSelf(); return }
         thread {
             val fmt = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
             while (run) {

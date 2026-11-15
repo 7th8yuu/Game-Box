@@ -5,8 +5,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -288,8 +293,22 @@ fun App(sp: SharedPreferences) {
         val hzv = listOf(0, 60, 90, 120, 144)[g("hz", 0)]; val sat = g("sat", 100) / 100f
         val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
         thread { Rt.applyGame(p, gm, res, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv); if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean() }
-        if (ov) ctx.startForegroundService(Intent(ctx, Overlay::class.java))
-        pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
+        fun launch(withOverlay: Boolean) {
+            if (withOverlay) ctx.startForegroundService(Intent(ctx, Overlay::class.java))
+            pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
+        }
+        if (!ov || Settings.canDrawOverlays(ctx)) launch(ov)
+        else thread {
+            // Thử cấp quyền vẽ đè bằng root/Shizuku; nếu vẫn thiếu thì mở trang cấp quyền, không mở game
+            Rt.grant(ctx.packageName)
+            Handler(Looper.getMainLooper()).post {
+                if (Settings.canDrawOverlays(ctx)) launch(true)
+                else {
+                    Toast.makeText(ctx, "Hãy bật \"Hiển thị trên ứng dụng khác\" cho Game Box rồi bấm Chơi lại", Toast.LENGTH_LONG).show()
+                    ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
+                }
+            }
+        }
     }
     fun power() {
         val p = Rt.pkg.ifEmpty { sel }; Rt.pkg = ""
@@ -331,7 +350,7 @@ fun App(sp: SharedPreferences) {
                             }
                             Text(
                                 when (be) { "root" -> "Root"; "shizuku" -> "Shizuku"; else -> "Chưa có quyền" },
-                                Modifier.clip(RoundedCornerShape(16.dp)).background(Color.White.copy(.08f)).clickable { thread { be = Rt.init() } }.padding(horizontal = 14.dp, vertical = 9.dp),
+                                Modifier.clip(RoundedCornerShape(16.dp)).background(Color.White.copy(.08f)).clickable { thread { be = Rt.init(); Rt.grant(ctx.packageName) } }.padding(horizontal = 14.dp, vertical = 9.dp),
                                 color = if (be == "none") Color(0xFFFF6B6B) else Color(0xFF4ADE80), fontSize = 13.sp
                             )
                             Spacer(Modifier.width(10.dp))

@@ -41,8 +41,14 @@ jobs:
             adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW allow
             adb logcat -c
             adb shell am start -W -n com.gamebox.helper/.MainActivity
-            sleep 20
-            adb logcat -d -t 3000 > smoke.log
+            sleep 15
+            adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW deny
+            adb shell am start-foreground-service -n com.gamebox.helper/.Overlay
+            sleep 5
+            adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW allow
+            adb shell am start-foreground-service -n com.gamebox.helper/.Overlay
+            sleep 10
+            adb logcat -d -t 5000 > smoke.log
             adb shell pidof com.gamebox.helper || echo "APP NOT RUNNING"
             grep -E -A45 "FATAL EXCEPTION" smoke.log || echo "NO FATAL EXCEPTION"
             adb shell run-as com.gamebox.helper cat files/crash.txt || echo "NO crash.txt"
