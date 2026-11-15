@@ -372,9 +372,9 @@ fun GfxPage(gs: Gs) {
                 Seg(listOf("Tiêu chuẩn", "Hiệu năng", "Tiết kiệm"), gs.g("gm", 0), Modifier.fillMaxWidth()) { gs.s("gm", it) }
                 Spacer(Modifier.height(6.dp))
                 SwRow("Hiệu năng cố định", "Khóa xung nhịp cho ổn định", gs.fixed) { gs.fixed = it; thread { Rt.fixed(it) } }
-                SwRow("Chặn thông báo", null, gs.dnd) { gs.setDnd(it) }
-                SwRow("Dọn RAM khi mở game", null, gs.cln) { gs.setCln(it) }
-                SwRow("Bảng điều khiển trong game", null, gs.ov) { gs.setOv(it); if (!it) ctx.stopService(android.content.Intent(ctx, Overlay::class.java)) }
+                SwRow("Chặn thông báo", null, gs.dnd) { gs.putDnd(it) }
+                SwRow("Dọn RAM khi mở game", null, gs.cln) { gs.putCln(it) }
+                SwRow("Bảng điều khiển trong game", null, gs.ov) { gs.putOv(it); if (!it) ctx.stopService(android.content.Intent(ctx, Overlay::class.java)) }
                 Sec(Ic.Timer, "Hiệu ứng hệ thống")
                 Seg(listOf("Bình thường", "Nhanh", "Tắt"), gs.g("anim", 0), Modifier.fillMaxWidth()) { gs.s("anim", it) }
                 Spacer(Modifier.height(10.dp))
@@ -385,7 +385,7 @@ fun GfxPage(gs: Gs) {
                         Box(Modifier.size(32.dp).bounce { gs.setTheme(i) }.clip(CircleShape).background(c).border(2.dp, ring, CircleShape))
                     }
                 }
-                SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.setLive(it) }
+                SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.putLive(it) }
                 Text("Mọi cài đặt được khôi phục khi bạn thoát game (nút nguồn bên trái).", fontSize = 11.sp, color = Color.White.copy(.5f))
                 Spacer(Modifier.height(6.dp))
             }

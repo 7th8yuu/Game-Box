@@ -141,10 +141,10 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").any { sp.contains("${it}_$p") }
 
     fun select(p: String) { sel = p; sp.edit().putString("sel", p).apply() }
-    fun setDnd(v: Boolean) { dnd = v; sp.edit().putBoolean("dnd", v).apply() }
-    fun setCln(v: Boolean) { cln = v; sp.edit().putBoolean("cln", v).apply() }
-    fun setOv(v: Boolean) { ov = v; sp.edit().putBoolean("ov", v).apply() }
-    fun setLive(v: Boolean) { live = v; sp.edit().putBoolean("live", v).apply() }
+    fun putDnd(v: Boolean) { dnd = v; sp.edit().putBoolean("dnd", v).apply() }
+    fun putCln(v: Boolean) { cln = v; sp.edit().putBoolean("cln", v).apply() }
+    fun putOv(v: Boolean) { ov = v; sp.edit().putBoolean("ov", v).apply() }
+    fun putLive(v: Boolean) { live = v; sp.edit().putBoolean("live", v).apply() }
     fun setTheme(i: Int) { Cy = Themes[i]; sp.edit().putInt("theme", i).apply() }
 
     fun label(p: String) = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p)
