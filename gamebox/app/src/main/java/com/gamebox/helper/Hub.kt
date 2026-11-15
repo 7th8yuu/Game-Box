@@ -2,6 +2,7 @@ package com.gamebox.helper
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.graphics.Color as AColor
 import android.os.Bundle
 import android.provider.Settings
@@ -68,7 +69,12 @@ class HubActivity : ComponentActivity() {
         val sp = getSharedPreferences("gs", Context.MODE_PRIVATE)
         Cy = Themes[sp.getInt("theme", 0).coerceIn(0, Themes.lastIndex)]
         val g = Gs(this, sp)
-        setContent { HubApp(g) }
+        // Chỉ bản debug: cho smoke test CI mở thẳng một tab/màn hình để chụp ảnh kiểm tra giao diện
+        val dbg = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        val tab0 = if (dbg) intent.getIntExtra("tab", 1).coerceIn(0, 2) else 1
+        val opt0 = if (dbg) intent.getIntExtra("opt", 0).coerceIn(0, 2) else 0
+        val act0 = dbg && intent.getBooleanExtra("act", false)
+        setContent { HubApp(g, tab0, opt0, act0) }
     }
 }
 
@@ -168,10 +174,10 @@ fun HubNav(sel: Int, set: (Int) -> Unit, mod: Modifier = Modifier) {
 }
 
 @Composable
-fun HubApp(gs: Gs) {
+fun HubApp(gs: Gs, initTab: Int = 1, initOpt: Int = 0, initAct: Boolean = false) {
     GsEffects(gs)
-    var tab by remember { mutableIntStateOf(1) }
-    var act by remember { mutableStateOf(false) }
+    var tab by remember { mutableIntStateOf(initTab) }
+    var act by remember { mutableStateOf(initAct) }
     var settings by remember { mutableStateOf(false) }
     BackHandler(enabled = act) { act = false }
     MaterialTheme(colorScheme = darkColorScheme(primary = Cy, background = Bg, surface = Bg, onBackground = Color.White, onSurface = Color.White)) {
@@ -189,7 +195,7 @@ fun HubApp(gs: Gs) {
                         when (t) {
                             0 -> ProfilePage(gs, { act = true }, { settings = true })
                             1 -> HomePage(gs, { tab = 0 })
-                            else -> OptPage(gs)
+                            else -> OptPage(gs, initOpt)
                         }
                     }
                 }

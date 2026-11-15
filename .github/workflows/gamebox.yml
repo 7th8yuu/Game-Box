@@ -24,6 +24,7 @@ jobs:
     continue-on-error: true
     timeout-minutes: 25
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { name: GameBox-debug, path: apk }
       - name: Enable KVM
@@ -55,3 +56,4 @@ jobs:
             adb shell pidof com.gamebox.helper || echo "APP NOT RUNNING"
             grep -E -A45 "FATAL EXCEPTION" smoke.log || echo "NO FATAL EXCEPTION"
             adb shell run-as com.gamebox.helper cat files/crash.txt || echo "NO crash.txt"
+            bash gamebox/ci/shots.sh

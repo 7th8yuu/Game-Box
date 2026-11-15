@@ -299,8 +299,8 @@ fun TabChip(ic: Ic, t: String, on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun OptPage(gs: Gs) {
-    var tab by remember { mutableIntStateOf(0) }
+fun OptPage(gs: Gs, initTab: Int = 0) {
+    var tab by remember { mutableIntStateOf(initTab) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(14.dp))
         Text("Tối ưu game", fontSize = 30.sp, fontWeight = FontWeight.Bold)
