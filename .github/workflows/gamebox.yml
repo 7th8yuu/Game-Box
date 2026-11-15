@@ -43,11 +43,12 @@ jobs:
             adb shell am start -W -n com.gamebox.helper/.MainActivity
             sleep 15
             adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW deny
-            adb shell am start-foreground-service -n com.gamebox.helper/.Overlay
-            sleep 5
+            adb shell am start -n com.gamebox.helper/.MainActivity --ez smoke_overlay true
+            sleep 6
             adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW allow
-            adb shell am start-foreground-service -n com.gamebox.helper/.Overlay
+            adb shell am start -n com.gamebox.helper/.MainActivity --ez smoke_overlay true
             sleep 10
+            adb shell dumpsys activity services com.gamebox.helper | grep -c "ServiceRecord" || echo "no running service"
             adb logcat -d -t 5000 > smoke.log
             adb shell pidof com.gamebox.helper || echo "APP NOT RUNNING"
             grep -E -A45 "FATAL EXCEPTION" smoke.log || echo "NO FATAL EXCEPTION"

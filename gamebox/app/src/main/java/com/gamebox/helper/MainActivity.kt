@@ -79,6 +79,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
+        // Chỉ bản debug: cho smoke test CI bật overlay trực tiếp (Overlay không được export)
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent.getBooleanExtra("smoke_overlay", false)) {
+            startForegroundService(Intent(this, Overlay::class.java))
+        }
         enableEdgeToEdge()
         WindowCompat.getInsetsController(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
