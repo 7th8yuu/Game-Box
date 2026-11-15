@@ -5,11 +5,20 @@ P=com.gamebox.helper
 shot() {
   sleep "${2:-7}"
   adb exec-out screencap -p > /tmp/s.png
-  convert /tmp/s.png -resize '720x720>' -quality 65 /tmp/s.jpg
-  echo "SHOT_BEGIN $1"; base64 /tmp/s.jpg; echo "SHOT_END $1"
+  # Có PIL thì nén JPEG cho nhẹ log, không thì gửi nguyên PNG
+  python3 - <<'PY' || cp /tmp/s.png /tmp/s.out
+from PIL import Image
+im = Image.open('/tmp/s.png').convert('RGB')
+im.thumbnail((800, 800))
+im.save('/tmp/s.out', 'JPEG', quality=70)
+PY
+  echo "SHOT_BEGIN $1"; base64 /tmp/s.out; echo "SHOT_END $1"
 }
 hub()  { adb shell am start -S -W -n $P/.HubActivity "$@" >/dev/null; }
 game() { adb shell am start -S -W -n $P/.MainActivity "$@" >/dev/null; }
+# Giả lập kích thước gần máy thật (720x1600, 360dp ngang) để bố cục giống điện thoại
+adb shell wm size 720x1600
+adb shell wm density 320
 adb shell wm size
 hub --ei tab 1;                 shot hub_home 10
 hub --ei tab 0;                 shot hub_profile
