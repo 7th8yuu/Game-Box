@@ -11,6 +11,7 @@ class Proc(val pkg: String, val mb: Int)
 object Rt {
     @Volatile var pkg = ""
     @Volatile var backend = "none" // root | shizuku | none
+    @Volatile var since = 0L // thời điểm có quyền (elapsedRealtime), dùng cho "Phiên truy cập"
     private var lt = 0L
     private var li = 0L
 
@@ -29,8 +30,16 @@ object Rt {
             }
             else -> "none"
         }
+        if (backend == "none") since = 0L else if (since == 0L) since = android.os.SystemClock.elapsedRealtime()
         return backend
     }
+
+    fun rootOk(): Boolean = runCatching { Shell.getShell().isRoot }.getOrDefault(false)
+
+    // 0 Shizuku không chạy, 1 chạy nhưng chưa cấp quyền, 2 đã cấp quyền
+    fun shizukuState(): Int = runCatching {
+        if (!Shizuku.pingBinder()) 0 else if (Shizuku.checkSelfPermission() == 0) 2 else 1
+    }.getOrDefault(0)
 
     fun sh(vararg c: String): List<String> = when (backend) {
         "root" -> Shell.cmd(*c).exec().out

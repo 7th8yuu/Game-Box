@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
         Cy = Themes[sp.getInt("theme", 0).coerceIn(0, Themes.lastIndex)]
         val g = Gs(this, sp)
         g.page = intent.getIntExtra("page", 0).coerceIn(0, 3)
+        intent.getStringExtra("game")?.let { g.select(it) }
         gs = g
         setContent { GameSpaceApp(g) }
     }
@@ -85,9 +86,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i)
         setIntent(i)
-        gs?.let { it.page = i.getIntExtra("page", it.page).coerceIn(0, 3) }
+        gs?.let { it.page = i.getIntExtra("page", it.page).coerceIn(0, 3); i.getStringExtra("game")?.let { p -> it.select(p) } }
     }
 }
+
+// Hồ sơ Mapping: ảnh chụp cài đặt đồ họa của một game, lưu trong SharedPreferences, chia sẻ qua clipboard
+class Prof(val name: String, val pkg: String, val cfg: Map<String, Int>)
 
 // Trạng thái dùng chung của Game Space, các trang chỉ đọc/ghi qua đây
 class Gs(val ctx: Context, val sp: SharedPreferences) {
@@ -97,10 +101,24 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     var tex by mutableStateOf(false)
     var menu by mutableStateOf(false)
 
-    val games: List<ApplicationInfo> = run {
-        val all = pm.getInstalledApplications(0).filter { pm.getLaunchIntentForPackage(it.packageName) != null && it.packageName != ctx.packageName }
-        val g = all.filter { it.category == ApplicationInfo.CATEGORY_GAME || (it.flags and ApplicationInfo.FLAG_IS_GAME) != 0 }
-        g.ifEmpty { all }.sortedBy { pm.getApplicationLabel(it).toString().lowercase() }
+    // Mọi ứng dụng mở được, và danh sách game tự nhận diện (dùng khi người dùng chưa tự chọn thư viện)
+    val allApps: List<ApplicationInfo> = pm.getInstalledApplications(0)
+        .filter { pm.getLaunchIntentForPackage(it.packageName) != null && it.packageName != ctx.packageName }
+        .sortedBy { pm.getApplicationLabel(it).toString().lowercase() }
+    private val auto: List<ApplicationInfo> = allApps
+        .filter { it.category == ApplicationInfo.CATEGORY_GAME || (it.flags and ApplicationInfo.FLAG_IS_GAME) != 0 }
+        .ifEmpty { allApps }
+    // Thư viện game do người dùng chọn (Trang chủ > Thêm). Trống thì dùng danh sách tự nhận diện
+    val lib = mutableStateListOf<String>().apply {
+        addAll((sp.getString("lib", "") ?: "").split(",").filter { it.isNotEmpty() && runCatching { pm.getApplicationInfo(it, 0) }.isSuccess })
+    }
+    val games: List<ApplicationInfo>
+        get() = if (lib.isEmpty()) auto else lib.mapNotNull { runCatching { pm.getApplicationInfo(it, 0) }.getOrNull() }
+    fun inLib(p: String) = if (lib.isEmpty()) auto.any { it.packageName == p } else p in lib
+    fun toggleLib(p: String) {
+        if (lib.isEmpty()) lib.addAll(auto.map { it.packageName })
+        if (p in lib) lib.remove(p) else lib.add(p)
+        sp.edit().putString("lib", lib.joinToString(",")).apply()
     }
     var sel by mutableStateOf(sp.getString("sel", null) ?: games.firstOrNull()?.packageName ?: "")
     val cfg = mutableStateMapOf<String, Int>()
@@ -125,6 +143,19 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     val hist = List(4) { mutableStateListOf<Int>() }
     val temps = mutableStateListOf<Float>()
     val playMs = mutableStateMapOf<String, Long>()
+    val lastMs = mutableStateMapOf<String, Long>()
+    var disk by mutableIntStateOf(0)
+    var rootOk by mutableStateOf(false)
+    var shz by mutableIntStateOf(0)
+    var upSec by mutableLongStateOf(0L)
+
+    // Mã người chơi hiển thị ở Trang chủ/Hồ sơ: băm từ ANDROID_ID, không gửi đi đâu
+    val pid: String = runCatching {
+        val id = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID) ?: "gamebox"
+        java.util.UUID.nameUUIDFromBytes(id.toByteArray()).toString().replace("-", "").take(8).uppercase()
+    }.getOrDefault("00000000")
+    val version: String = runCatching { pm.getPackageInfo(ctx.packageName, 0).versionName ?: "1.0" }.getOrDefault("1.0")
+    val model: String = android.os.Build.MODEL
 
     private val disp = ctx.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
     val hzs: Set<Int> = runCatching { disp.supportedModes.map { it.refreshRate.roundToInt() }.toSet() }.getOrDefault(setOf(60))
@@ -139,6 +170,38 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun custom(p: String): Boolean =
         cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").any { sp.contains("${it}_$p") }
 
+    val profiles = mutableStateListOf<Prof>().apply {
+        runCatching {
+            val a = org.json.JSONArray(sp.getString("profiles", "[]"))
+            for (i in 0 until a.length()) {
+                val o = a.getJSONObject(i); val c = o.getJSONObject("c")
+                add(Prof(o.getString("n"), o.getString("p"), c.keys().asSequence().associateWith { c.getInt(it) }))
+            }
+        }
+    }
+    private fun saveProfiles() {
+        val a = org.json.JSONArray()
+        profiles.forEach { a.put(org.json.JSONObject().put("n", it.name).put("p", it.pkg).put("c", org.json.JSONObject(it.cfg))) }
+        sp.edit().putString("profiles", a.toString()).apply()
+    }
+    fun addProfile() {
+        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0)
+        val stamp = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+        profiles.add(0, Prof("$selName · $stamp", sel, keys.mapValues { (k, d) -> g(k, d) }))
+        saveProfiles()
+    }
+    fun applyProfile(p: Prof) { select(p.pkg); p.cfg.forEach { (k, v) -> s(k, v) } }
+    fun removeProfile(p: Prof) { profiles.remove(p); saveProfiles() }
+    fun profileJson(p: Prof): String =
+        org.json.JSONObject().put("app", "GameBox").put("n", p.name).put("p", p.pkg).put("c", org.json.JSONObject(p.cfg)).toString()
+    fun importProfile(t: String): Boolean = runCatching {
+        val o = org.json.JSONObject(t)
+        if (o.optString("app") != "GameBox") return@runCatching false
+        val c = o.getJSONObject("c")
+        profiles.add(0, Prof(o.getString("n"), o.getString("p"), c.keys().asSequence().associateWith { c.getInt(it) }))
+        saveProfiles(); true
+    }.getOrDefault(false)
+
     fun select(p: String) { sel = p; sp.edit().putString("sel", p).apply() }
     fun putDnd(v: Boolean) { dnd = v; sp.edit().putBoolean("dnd", v).apply() }
     fun putCln(v: Boolean) { cln = v; sp.edit().putBoolean("cln", v).apply() }
@@ -147,7 +210,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun setTheme(i: Int) { Cy = Themes[i]; sp.edit().putInt("theme", i).apply() }
 
     fun label(p: String) = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p)
-    val selName: String get() = games.firstOrNull { it.packageName == sel }?.let { pm.getApplicationLabel(it).toString() } ?: "Chơi"
+    val selName: String get() = if (sel.isEmpty()) "Chơi" else label(sel)
     fun icon(p: String): ImageBitmap? = icons[p] ?: runCatching { pm.getApplicationIcon(p).toBitmap(192, 192).asImageBitmap() }.getOrNull()?.also { icons[p] = it }
 
     // Điểm hiệu năng 0..100 từ RAM, CPU và nhiệt độ
@@ -161,14 +224,26 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         clock = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         listOf(x.cpuP, x.gpuP, ram, x.fps).forEachIndexed { i, v -> hist[i].add(v); if (hist[i].size > 60) hist[i].removeAt(0) }
         temps.add(b.t); if (temps.size > 600) temps.removeAt(0)
+        runCatching {
+            val sf = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+            disk = (100 - sf.availableBytes * 100 / sf.totalBytes.coerceAtLeast(1L)).toInt()
+        }
+        upSec = if (Rt.since > 0L) (android.os.SystemClock.elapsedRealtime() - Rt.since) / 1000L else 0L
     }
+
+    // Kiểm tra từng quyền riêng (Root, Shizuku) cho Trung tâm kích hoạt
+    fun refreshAccess() {
+        rootOk = Rt.rootOk(); shz = Rt.shizukuState(); be = Rt.backend
+    }
+
+    fun fmtUp(): String = String.format(Locale.US, "%02d:%02d:%02d", upSec / 3600, (upSec / 60) % 60, upSec % 60)
 
     // Thời gian chơi cần quyền truy cập dữ liệu sử dụng, Rt.grant cấp bằng root/Shizuku
     fun loadPlaytime() {
         runCatching {
             val um = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
-            um.queryAndAggregateUsageStats(now - 365L * 86400000L, now).forEach { (k, v) -> playMs[k] = v.totalTimeInForeground }
+            um.queryAndAggregateUsageStats(now - 365L * 86400000L, now).forEach { (k, v) -> playMs[k] = v.totalTimeInForeground; lastMs[k] = v.lastTimeUsed }
         }
     }
 
@@ -209,19 +284,25 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     }
 }
 
-private val Titles = listOf("Chọn game", "Hiệu năng", "Pin", "Đồ họa")
-
+// Vòng lặp nền dùng chung cho cả Game Space và Hub: cấp quyền, đọc số liệu, ping
 @Composable
-fun GameSpaceApp(gs: Gs) {
+fun GsEffects(gs: Gs) {
     val ctx = gs.ctx
-    BackHandler(enabled = gs.tex) { gs.tex = false }
-
     LaunchedEffect(Unit) {
-        gs.be = withContext(Dispatchers.IO) { val b = Rt.init(); Rt.grant(ctx.packageName); b }
+        withContext(Dispatchers.IO) { Rt.init(); Rt.grant(ctx.packageName); gs.refreshAccess() }
         withContext(Dispatchers.IO) { gs.loadPlaytime() }
     }
     LaunchedEffect(Unit) { while (true) { withContext(Dispatchers.IO) { gs.sample() }; delay(1000) } }
     LaunchedEffect(Unit) { while (true) { gs.ping = withContext(Dispatchers.IO) { Rt.ping() }; delay(10000) } }
+}
+
+private val Titles = listOf("Chọn game", "Hiệu năng", "Pin", "Đồ họa")
+
+@Composable
+fun GameSpaceApp(gs: Gs) {
+    BackHandler(enabled = gs.tex) { gs.tex = false }
+
+    GsEffects(gs)
     LaunchedEffect(gs.page) { while (gs.page == 1) { gs.procs = withContext(Dispatchers.IO) { Rt.heavy() }; delay(8000) } }
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Cy, background = Bg, surface = Bg, onBackground = Color.White, onSurface = Color.White)) {

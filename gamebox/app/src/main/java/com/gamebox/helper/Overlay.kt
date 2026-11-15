@@ -173,7 +173,7 @@ class Overlay : Service() {
             val v = it.on; thread { Rt.record(v) }
         }
         hex("👆", "Hiện chạm") { it.on = !it.on; it.invalidate(); val v = if (it.on) 1 else 0; thread { Rt.sh("settings put system show_touches $v") } }
-        hex("🏠", "Về app") { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        hex("🏠", "Về app") { startActivity(Intent(this, HubActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         hex("✕", "Thoát") { val p = Rt.pkg; Rt.pkg = ""; thread { Rt.restore(p); Rt.mode(0); Rt.dnd(false) }; stopSelf() }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(14), dp(10)); background = bg(); visibility = View.GONE

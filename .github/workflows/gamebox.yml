@@ -40,8 +40,10 @@ jobs:
             adb install -r apk/app-debug.apk
             adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW allow
             adb logcat -c
+            adb shell am start -S -W -n com.gamebox.helper/.HubActivity
+            sleep 12
             adb shell am start -S -W -n com.gamebox.helper/.MainActivity
-            sleep 15
+            sleep 12
             adb shell appops set com.gamebox.helper SYSTEM_ALERT_WINDOW deny
             adb shell am start -S -W -n com.gamebox.helper/.MainActivity --ez smoke_overlay true
             sleep 6

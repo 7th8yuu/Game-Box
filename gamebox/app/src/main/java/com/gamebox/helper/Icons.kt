@@ -23,7 +23,7 @@ import kotlin.math.sin
 enum class Ic {
     Game, Gauge, Battery, Tune, Power, Home, User, Touch, Back, Check, Plus, Minus, Info, Bolt, Thermo, Chip,
     Cam, Rec, Target, Cursor, Refresh, Res, Shield, Bell, Timer, Mic, Vol, Net, Save, Reset, Drag, Down, Close,
-    Layers, Play, Rocket, Pulse, Gear, Bandage, Sun, Bulb, Link, Hand
+    Layers, Play, Rocket, Pulse, Gear, Bandage, Sun, Bulb, Link, Hand, Grid, Phone, Hash
 }
 
 @Composable
@@ -111,6 +111,9 @@ fun DrawScope.drawIc(k: Ic, tint: Color) {
         Ic.Bulb -> { arc(6f, 3f, 12f, 12f, 150f, 240f); line(9.5f, 17f, 14.5f, 17f); line(10.5f, 20f, 13.5f, 20f); line(9f, 13.5f, 9.5f, 17f); line(15f, 13.5f, 14.5f, 17f) }
         Ic.Link -> { box(3f, 9f, 11f, 6f, 3f); box(10f, 9f, 11f, 6f, 3f) }
         Ic.Hand -> { poly(8f, 13f, 8f, 20f, 12f, 21.5f, 17f, 20f, 17.5f, 12f); line(8f, 13f, 8f, 5f); line(11f, 12f, 11f, 3.5f); line(14f, 12f, 14f, 5f); line(17f, 12f, 17f, 8f) }
+        Ic.Grid -> { box(3.5f, 3.5f, 7f, 7f, 2f); box(13.5f, 3.5f, 7f, 7f, 2f); box(3.5f, 13.5f, 7f, 7f, 2f); box(13.5f, 13.5f, 7f, 7f, 2f) }
+        Ic.Phone -> { box(6.5f, 2.5f, 11f, 19f, 3f); line(10.5f, 18.5f, 13.5f, 18.5f) }
+        Ic.Hash -> { line(9f, 4f, 7f, 20f); line(17f, 4f, 15f, 20f); line(4.5f, 9f, 20f, 9f); line(4f, 15f, 19.5f, 15f) }
         else -> Unit
     }
 }
