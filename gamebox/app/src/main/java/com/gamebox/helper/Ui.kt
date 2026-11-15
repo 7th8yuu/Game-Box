@@ -10,6 +10,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -186,6 +188,7 @@ fun GSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 // Thanh trượt có núm vuông bo tròn; rainbow = nền cầu vồng như ảnh mẫu
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GSlider(value: Float, range: ClosedFloatingPointRange<Float>, steps: Int = 0, rainbow: Boolean = false, mod: Modifier = Modifier, onChange: (Float) -> Unit) {
     val brush = Brush.horizontalGradient(listOf(Color(0xFFFF5A5F), Color(0xFFFFC145), Color(0xFF8EDB5E), Color(0xFF3FB6FF), Color(0xFFA78BFA)))
