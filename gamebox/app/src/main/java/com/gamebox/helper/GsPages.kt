@@ -376,7 +376,7 @@ fun GfxPage(gs: Gs) {
                 SwRow("Hiệu năng cố định", "Khóa xung nhịp cho ổn định", gs.fixed) { gs.fixed = it; thread { Rt.fixed(it) } }
                 SwRow("Chặn thông báo", null, gs.dnd) { gs.putDnd(it) }
                 SwRow("Dọn RAM khi mở game", null, gs.cln) { gs.putCln(it) }
-                SwRow("Bảng điều khiển trong game", null, gs.ov) { gs.putOv(it); if (!it) ctx.stopService(android.content.Intent(ctx, Overlay::class.java)) }
+                SwRow("Bảng điều khiển trong game", null, gs.ov) { gs.putOv(it); if (!it && Overlay.alive) ctx.startService(android.content.Intent(ctx, Overlay::class.java).putExtra("ui", false)) }
                 Sec(Ic.Timer, "Hiệu ứng hệ thống")
                 Seg(listOf("Thường", "Nhanh", "Tắt"), gs.g("anim", 0), Modifier.fillMaxWidth()) { gs.s("anim", it) }
                 Spacer(Modifier.height(10.dp))

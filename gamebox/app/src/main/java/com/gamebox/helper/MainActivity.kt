@@ -67,7 +67,11 @@ class MainActivity : ComponentActivity() {
         if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
         // Chỉ bản debug: cho smoke test CI bật overlay trực tiếp (Overlay không được export)
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent.getBooleanExtra("smoke_overlay", false)) {
-            startForegroundService(Intent(this, Overlay::class.java))
+            // ov_dock / ov_open cho phép chụp từng trạng thái của overlay (0 nổi, 1 trái, 2 phải)
+            val oi = Intent(this, Overlay::class.java)
+            if (intent.hasExtra("ov_dock")) oi.putExtra("dock", intent.getIntExtra("ov_dock", 0))
+            if (intent.hasExtra("ov_open")) oi.putExtra("open", intent.getBooleanExtra("ov_open", false))
+            startForegroundService(oi)
         }
         enableEdgeToEdge()
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -162,6 +166,15 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     val refresh: Int get() = runCatching { disp.refreshRate.roundToInt() }.getOrDefault(60)
 
     private val icons = HashMap<String, ImageBitmap>()
+
+    init {
+        // Phiên trước còn dang dở (app bị tắt giữa chừng): trả lại cài đặt để game mở ngoài app chạy bình thường
+        val pend = sp.getString("sess", "") ?: ""
+        if (pend.isNotEmpty() && !Overlay.alive) {
+            sp.edit().remove("sess").apply()
+            thread { Rt.init(); Rt.restore(pend); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+        }
+    }
 
     fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
@@ -259,8 +272,10 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         val hzv = g("hz", 0).let { if (it < 30) 0 else it }; val sat = g("sat", 100) / 100f
         val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
         thread { Rt.applyGame(p, gm, res, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv); if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean() }
+        // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và tự khôi phục cài đặt khi game thoát; ui=false thì không vẽ nút nổi
         fun launch(withOverlay: Boolean) {
-            if (withOverlay) ctx.startForegroundService(Intent(ctx, Overlay::class.java))
+            sp.edit().putString("sess", p).apply()
+            ctx.startForegroundService(Intent(ctx, Overlay::class.java).putExtra("ui", withOverlay))
             pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
         }
         if (!ov || Settings.canDrawOverlays(ctx)) launch(ov)
@@ -279,6 +294,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     fun power() {
         val p = Rt.pkg.ifEmpty { sel }; Rt.pkg = ""
+        sp.edit().remove("sess").apply()
         ctx.stopService(Intent(ctx, Overlay::class.java))
         thread { Rt.restore(p); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
     }
