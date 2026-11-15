@@ -47,7 +47,8 @@ object Rt {
         r
     }.getOrDefault(emptyList())
 
-    fun grant(p: String) { sh("appops set $p SYSTEM_ALERT_WINDOW allow", "pm grant $p android.permission.POST_NOTIFICATIONS") }
+    // Cấp quyền vẽ đè, thông báo và đọc thời gian sử dụng (để hiện giờ đã chơi) bằng root/Shizuku
+    fun grant(p: String) { sh("appops set $p SYSTEM_ALERT_WINDOW allow", "appops set $p GET_USAGE_STATS allow", "pm grant $p android.permission.POST_NOTIFICATIONS") }
 
     // m: 0 chuẩn/cân bằng, 1 hiệu năng, 2 tiết kiệm (ghi governor cần root)
     fun mode(m: Int) {
