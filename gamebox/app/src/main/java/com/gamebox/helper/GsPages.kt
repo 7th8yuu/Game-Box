@@ -157,10 +157,6 @@ fun GamesPage(gs: Gs) {
         GCard(gs.hz, Modifier.fillMaxWidth().enter(150)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.widthIn(max = 130.dp).padding(end = 22.dp)) {
-                        Text("ĐANG CHỌN", fontSize = 10.sp, letterSpacing = 1.5.sp, color = Color.White.copy(.6f))
-                        Text(gs.selName, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    }
                     Stat("NHIỆT ĐỘ", "${b?.t ?: 0f}°C")
                     Stat("CPU", "${f1((st?.cpu ?: 0) / 1000.0)} GHz")
                     Stat("PING DNS", if (gs.ping < 0) "-" else "${gs.ping} ms")
@@ -375,14 +371,14 @@ fun GfxPage(gs: Gs) {
                     else listOf("res", "fps", "msaa", "anim").forEach { k -> gs.unset(k) }
                 }
                 Sec(Ic.Game, "Chế độ game")
-                Seg(listOf("Tiêu chuẩn", "Hiệu năng", "Tiết kiệm"), gs.g("gm", 0), Modifier.fillMaxWidth()) { gs.s("gm", it) }
+                Seg(listOf("Chuẩn", "Hiệu năng", "Tiết kiệm"), gs.g("gm", 0), Modifier.fillMaxWidth()) { gs.s("gm", it) }
                 Spacer(Modifier.height(6.dp))
                 SwRow("Hiệu năng cố định", "Khóa xung nhịp cho ổn định", gs.fixed) { gs.fixed = it; thread { Rt.fixed(it) } }
                 SwRow("Chặn thông báo", null, gs.dnd) { gs.putDnd(it) }
                 SwRow("Dọn RAM khi mở game", null, gs.cln) { gs.putCln(it) }
                 SwRow("Bảng điều khiển trong game", null, gs.ov) { gs.putOv(it); if (!it) ctx.stopService(android.content.Intent(ctx, Overlay::class.java)) }
                 Sec(Ic.Timer, "Hiệu ứng hệ thống")
-                Seg(listOf("Bình thường", "Nhanh", "Tắt"), gs.g("anim", 0), Modifier.fillMaxWidth()) { gs.s("anim", it) }
+                Seg(listOf("Thường", "Nhanh", "Tắt"), gs.g("anim", 0), Modifier.fillMaxWidth()) { gs.s("anim", it) }
                 Spacer(Modifier.height(10.dp))
                 Sec(Ic.Bulb, "Giao diện")
                 Row(Modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

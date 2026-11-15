@@ -211,7 +211,7 @@ fun ProfilePage(gs: Gs, openAct: () -> Unit, openSettings: () -> Unit) {
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Quyền truy cập Game Box", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("Quyền truy cập", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     Text(accessDetail(gs), fontSize = 13.sp, color = Dim)
                 }
                 ArrowBtn()
@@ -290,11 +290,11 @@ fun TabChip(ic: Ic, t: String, on: Boolean, onClick: () -> Unit) {
     val bg by animateColorAsState(if (on) Cy.copy(.14f) else Color.White.copy(.04f), tween(220), label = "tcb")
     val bc by animateColorAsState(if (on) Cy.copy(.6f) else Color.White.copy(.1f), tween(220), label = "tcc")
     val c by animateColorAsState(if (on) Cy else Color.White.copy(.75f), tween(220), label = "tct")
-    Row(Modifier.bounce(onClick = onClick).clip(s).background(bg).border(1.dp, bc, s).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.bounce(onClick = onClick).clip(s).background(bg).border(1.dp, bc, s).padding(horizontal = 11.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         AnimatedVisibility(on, enter = fadeIn(tween(200)) + expandHorizontally(tween(240)), exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200))) {
             Row { Ico(ic, tint = c, sz = 18.dp); Spacer(Modifier.width(6.dp)) }
         }
-        Text(t, color = c, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        Text(t, color = c, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
     }
 }
 
@@ -409,7 +409,7 @@ private fun TestRow(ic: Ic, title: String, sub: String, status: String, onClick:
                 Text(sub, fontSize = 12.sp, color = Dim)
             }
             Spacer(Modifier.width(8.dp))
-            Text(status, Modifier.widthIn(max = 72.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Dim, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            Text(status, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Dim, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1, softWrap = false)
         }
     }
 }
@@ -427,8 +427,8 @@ fun TouchCheckTab(gs: Gs) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Phone, tint = Cy, sz = 20.dp)
             Spacer(Modifier.width(10.dp))
-            Text("Màn hình máy này", Modifier.weight(1f), fontWeight = FontWeight.Bold)
-            Text(gs.model, fontSize = 12.sp, color = Dim)
+            Text("Màn hình máy này", Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(gs.model, Modifier.widthIn(max = 120.dp), fontSize = 12.sp, color = Dim, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

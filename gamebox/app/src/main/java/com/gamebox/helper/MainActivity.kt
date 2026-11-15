@@ -343,7 +343,7 @@ fun GsHeader(gs: Gs) {
     val b = gs.bat
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("GAME BOX  ·  GAME SPACE", fontSize = 11.sp, letterSpacing = 3.sp, color = Cy)
+            Text("GAME SPACE", fontSize = 11.sp, letterSpacing = 3.sp, color = Cy, maxLines = 1)
             AnimatedContent(gs.page, label = "title", transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) }) { p ->
                 Text(Titles[p], fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }

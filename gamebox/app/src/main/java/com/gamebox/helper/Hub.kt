@@ -218,8 +218,8 @@ fun ModeCard(title: String, sub: String, ic: Ic, on: Boolean, mod: Modifier, onC
     Column(mod.bounce(onClick = onClick).clip(s).background(bg).border(1.dp, bc, s).padding(16.dp)) {
         Ico(ic, tint = Cy, sz = 24.dp)
         Spacer(Modifier.height(14.dp))
-        Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(sub, fontSize = 12.sp, color = Dim, maxLines = 1)
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 20.sp)
+        Text(sub, fontSize = 11.sp, color = Dim, maxLines = 2)
     }
 }
 

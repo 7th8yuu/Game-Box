@@ -168,7 +168,7 @@ fun Seg(items: List<String>, sel: Int, mod: Modifier = Modifier, enabled: List<B
                 val ok = enabled?.getOrNull(i) ?: true
                 val c by animateColorAsState(if (!ok) Color.White.copy(.25f) else if (i == sel) Cy else Color.White.copy(.85f), tween(200), label = "segc")
                 Box(Modifier.weight(1f).height(40.dp).clip(r).clickable(enabled = ok) { on(i) }, contentAlignment = Alignment.Center) {
-                    Text(s, color = c, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text(s, color = c, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -209,11 +209,11 @@ fun GSlider(value: Float, range: ClosedFloatingPointRange<Float>, steps: Int = 0
 fun PrimaryBtn(text: String, mod: Modifier = Modifier, icon: Ic? = null, onClick: () -> Unit) {
     val s = RoundedCornerShape(18.dp)
     Row(
-        mod.bounce(onClick = onClick).clip(s).background(Brush.horizontalGradient(listOf(Cy, Cy.copy(.8f)))).padding(horizontal = 20.dp, vertical = 12.dp),
+        mod.bounce(onClick = onClick).clip(s).background(Brush.horizontalGradient(listOf(Cy, Cy.copy(.8f)))).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) { Ico(icon, tint = OnAccent, sz = 20.dp); Spacer(Modifier.width(8.dp)) }
-        Text(text, color = OnAccent, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+        Text(text, color = OnAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, softWrap = false)
     }
 }
 
