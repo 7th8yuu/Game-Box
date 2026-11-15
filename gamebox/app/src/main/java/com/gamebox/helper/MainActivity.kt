@@ -134,9 +134,8 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
-    fun reset() {
-        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").forEach { sp.edit().remove("${it}_$sel").apply(); cfg.remove("${it}_$sel") }
-    }
+    fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
+    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").forEach { unset(it) } }
     fun custom(p: String): Boolean =
         cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").any { sp.contains("${it}_$p") }
 

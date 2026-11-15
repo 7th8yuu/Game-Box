@@ -2,6 +2,7 @@ package com.gamebox.helper
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -9,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,8 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -34,24 +34,22 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// Màn hình Kết cấu: so sánh trước/sau bằng icon game, chọn mức giảm độ phân giải render
+// Màn hình Kết cấu: so sánh trước/sau trên cảnh mẫu, chọn mức giảm độ phân giải render
 @Composable
 fun TexScreen(gs: Gs) {
     val icon = gs.icon(gs.sel)
     val name = gs.selName
     val levels = listOf(100, 85, 70, 60, 50)
     val names = listOf("Gốc", "Nhẹ", "Retro", "Khối", "Cực đại")
-    val grid = listOf(192, 96, 48, 24, 12)
+    val fracs = listOf(1f, .5f, .25f, .125f, .0625f)
     val res = gs.g("res", 100)
     var lvl by remember { mutableIntStateOf(levels.indices.minByOrNull { abs(levels[it] - res) } ?: 0) }
     var on by remember { mutableStateOf(true) }
     var pos by remember { mutableFloatStateOf(.5f) }
-    val after = remember(icon, lvl) {
-        icon?.let {
-            val small = android.graphics.Bitmap.createScaledBitmap(it.asAndroidBitmap(), grid[lvl], grid[lvl], true)
-            android.graphics.Bitmap.createScaledBitmap(small, 192, 192, false).asImageBitmap()
-        }
-    }
+    val scene = remember { sceneBitmap() }
+    val after = remember(lvl) { pixelate(scene, fracs[lvl]) }
+    var hold by remember { mutableStateOf(false) }
+    val shown by animateFloatAsState(if (hold) 1f else pos, if (hold) tween<Float>(150) else snap<Float>(), label = "hold")
     BackHandler { gs.tex = false }
     val tag = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(.55f)).padding(horizontal = 10.dp, vertical = 4.dp)
     Box(Modifier.fillMaxSize().background(Color(0xF2080E14)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
@@ -64,19 +62,23 @@ fun TexScreen(gs: Gs) {
                     Text("Kết cấu", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, Color.White.copy(.2f), RoundedCornerShape(20.dp))) {
-                    if (icon != null && after != null) {
-                        Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
-                            detectHorizontalDragGestures { change, _ -> pos = (change.position.x / size.width).coerceIn(0f, 1f) }
-                        }) {
-                            val w = size.width.toInt(); val h = size.height.toInt()
-                            drawImage(icon, dstSize = IntSize(w, h), filterQuality = FilterQuality.None)
-                            clipRect(left = size.width * pos) { drawImage(after, dstSize = IntSize(w, h), filterQuality = FilterQuality.None) }
+                    Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
+                        detectHorizontalDragGestures { change, _ -> pos = (change.position.x / size.width).coerceIn(0f, 1f) }
+                    }) {
+                        val w = size.width.toInt(); val h = size.height.toInt()
+                        drawImage(scene, dstSize = IntSize(w, h), filterQuality = FilterQuality.None)
+                        clipRect(left = size.width * shown) { drawImage(after, dstSize = IntSize(w, h), filterQuality = FilterQuality.None) }
+                        if (!hold) {
                             drawLine(Color.White, Offset(size.width * pos, 0f), Offset(size.width * pos, size.height), strokeWidth = 2.dp.toPx())
                             drawCircle(Color.White, 16.dp.toPx(), Offset(size.width * pos, size.height / 2))
                         }
                     }
                     Text("TRƯỚC", tag.align(Alignment.TopStart).padding(10.dp), fontSize = 10.sp, letterSpacing = 2.sp)
                     Text("SAU", tag.align(Alignment.TopEnd).padding(10.dp), fontSize = 10.sp, letterSpacing = 2.sp)
+                    Pill(Modifier.align(Alignment.BottomCenter).padding(10.dp).pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
+                        Ico(Ic.Hand, sz = 18.dp)
+                        Text("Giữ: Trước", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.White.copy(.06f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (icon != null) Image(icon, null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))

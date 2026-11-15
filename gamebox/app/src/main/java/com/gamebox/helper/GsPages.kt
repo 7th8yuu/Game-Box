@@ -368,6 +368,12 @@ fun GfxPage(gs: Gs) {
         }
         GCard(gs.hz, Modifier.weight(1f).fillMaxHeight().enter(80)) {
             ScrollCol {
+                // Chế độ nhẹ: một công tắc gom các tùy chọn giảm tải cho máy yếu (theo từng game)
+                val light = gs.g("res", 100) <= 70 && gs.g("fps", 5) <= 2 && gs.g("msaa", 0) == 0 && gs.g("anim", 0) == 2
+                SwRow("Chế độ nhẹ", "Độ phân giải 70%, FPS 60, tắt MSAA và hiệu ứng hệ thống", light) {
+                    if (it) { gs.s("res", 70); gs.s("fps", 2); gs.s("msaa", 0); gs.s("anim", 2) }
+                    else listOf("res", "fps", "msaa", "anim").forEach { k -> gs.unset(k) }
+                }
                 Sec(Ic.Game, "Chế độ game")
                 Seg(listOf("Tiêu chuẩn", "Hiệu năng", "Tiết kiệm"), gs.g("gm", 0), Modifier.fillMaxWidth()) { gs.s("gm", it) }
                 Spacer(Modifier.height(6.dp))
