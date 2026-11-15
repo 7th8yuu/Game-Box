@@ -195,7 +195,7 @@ fun OvBubbleUi(s: OvState, tap: () -> Unit, long: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${s.fps}", fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 16.sp)
+                    Text(if (s.fps > 0) "${s.fps}" else "–", fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 16.sp)
                     Text("FPS", fontSize = 8.sp, color = Cy, lineHeight = 9.sp)
                 }
             }
@@ -227,7 +227,7 @@ fun OvChip(l: String, v: String, mod: Modifier) {
 @Composable
 fun OvStats(s: OvState) {
     Row(verticalAlignment = Alignment.Bottom) {
-        Text("${s.fps}", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Cy, lineHeight = 42.sp)
+        Text(if (s.fps > 0) "${s.fps}" else "–", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Cy, lineHeight = 42.sp)
         Text(" FPS", Modifier.padding(bottom = 6.dp), fontSize = 12.sp, color = Color.White.copy(.7f))
         Spacer(Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
@@ -351,6 +351,9 @@ class Overlay : Service() {
         wm = getSystemService(WindowManager::class.java)
         sp = getSharedPreferences("gs", Context.MODE_PRIVATE)
         Cy = Themes[sp.getInt("theme", 0).coerceIn(0, Themes.lastIndex)]
+        // Dịch vụ có thể chạy khi Activity không còn: nạp lại gói game của phiên và kiểm tra quyền, nếu không FPS sẽ luôn là 0
+        if (Rt.pkg.isEmpty()) Rt.pkg = sp.getString("sess", "") ?: ""
+        if (Rt.backend == "none") thread { Rt.init() }
         buildFeats()
     }
 

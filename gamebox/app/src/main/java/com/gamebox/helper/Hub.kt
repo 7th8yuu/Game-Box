@@ -66,6 +66,7 @@ class HubActivity : ComponentActivity() {
         super.onCreate(b)
         if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
         enableEdgeToEdge(SystemBarStyle.dark(AColor.TRANSPARENT), SystemBarStyle.dark(AColor.TRANSPARENT))
+        cap60(this)
         val sp = getSharedPreferences("gs", Context.MODE_PRIVATE)
         Cy = Themes[sp.getInt("theme", 0).coerceIn(0, Themes.lastIndex)]
         val g = Gs(this, sp)

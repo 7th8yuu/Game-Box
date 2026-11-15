@@ -187,7 +187,8 @@ private fun GameCard(gs: Gs, a: ApplicationInfo, i: Int) {
             .graphicsLayer { scaleX = sc; scaleY = sc }.clip(sh).border(bw, bc, sh)
     ) {
         if (ic != null) {
-            Image(ic, null, Modifier.fillMaxSize().blur(22.dp), contentScale = ContentScale.Crop)
+            val sb = remember(p) { gs.soft(p) }
+            if (sb != null) Image(sb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(.75f)))))
             Image(ic, null, Modifier.align(Alignment.Center).size(84.dp).clip(RoundedCornerShape(20.dp)))
         } else Box(Modifier.fillMaxSize().background(Color.White.copy(.08f)))
@@ -350,7 +351,7 @@ fun GfxPage(gs: Gs) {
                 Sec(Ic.Sun, "Độ bão hòa màu", "${f1(gs.g("sat", 100) / 100.0)}x")
                 GSlider(gs.g("sat", 100) / 100f, 0.8f..2f, rainbow = true, mod = Modifier.fillMaxWidth()) { gs.s("sat", (it * 20).roundToInt() * 5) }
                 Sec(Ic.Res, "Độ phân giải game", "${gs.g("res", 100)}%")
-                GSlider(gs.g("res", 100).toFloat(), 50f..100f, steps = 9, mod = Modifier.fillMaxWidth()) { gs.s("res", (it / 5).roundToInt() * 5) }
+                GSlider(gs.g("res", 100).toFloat(), 30f..100f, steps = 13, mod = Modifier.fillMaxWidth()) { gs.s("res", (it / 5).roundToInt() * 5) }
                 Text("Cần Android 13 trở lên để áp dụng.", fontSize = 11.sp, color = Color.White.copy(.5f))
                 Spacer(Modifier.height(6.dp))
                 Sec(Ic.Pulse, "Giới hạn FPS")
@@ -388,6 +389,7 @@ fun GfxPage(gs: Gs) {
                     }
                 }
                 SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.putLive(it) }
+                SwRow("Kính mờ", "Làm mờ nền sau thẻ. Tắt nếu giao diện còn giật", GlassOn) { gs.putGlass(it) }
                 Text("Mọi cài đặt được khôi phục khi bạn thoát game (nút nguồn bên trái).", fontSize = 11.sp, color = Color.White.copy(.5f))
                 Spacer(Modifier.height(6.dp))
             }

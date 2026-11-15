@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
             startForegroundService(oi)
         }
         enableEdgeToEdge()
+        cap60(this)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -166,8 +167,10 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     val refresh: Int get() = runCatching { disp.refreshRate.roundToInt() }.getOrDefault(60)
 
     private val icons = HashMap<String, ImageBitmap>()
+    private val softs = HashMap<String, ImageBitmap>()
 
     init {
+        GlassOn = sp.getBoolean("glass", defaultGlass())
         // Phiên trước còn dang dở (app bị tắt giữa chừng): trả lại cài đặt để game mở ngoài app chạy bình thường
         val pend = sp.getString("sess", "") ?: ""
         if (pend.isNotEmpty() && !Overlay.alive) {
@@ -179,9 +182,9 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
     fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
-    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").forEach { unset(it) } }
+    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb").forEach { unset(it) } }
     fun custom(p: String): Boolean =
-        cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim").any { sp.contains("${it}_$p") }
+        cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb").any { sp.contains("${it}_$p") }
 
     val profiles = mutableStateListOf<Prof>().apply {
         runCatching {
@@ -198,7 +201,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         sp.edit().putString("profiles", a.toString()).apply()
     }
     fun addProfile() {
-        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0)
+        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texd" to 0, "texb" to 0)
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
         profiles.add(0, Prof("$selName · $stamp", sel, keys.mapValues { (k, d) -> g(k, d) }))
         saveProfiles()
@@ -220,10 +223,14 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun putCln(v: Boolean) { cln = v; sp.edit().putBoolean("cln", v).apply() }
     fun putOv(v: Boolean) { ov = v; sp.edit().putBoolean("ov", v).apply() }
     fun putLive(v: Boolean) { live = v; sp.edit().putBoolean("live", v).apply() }
+    fun putGlass(v: Boolean) { GlassOn = v; sp.edit().putBoolean("glass", v).apply() }
     fun setTheme(i: Int) { Cy = Themes[i]; sp.edit().putInt("theme", i).apply() }
 
     fun label(p: String) = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p)
     val selName: String get() = if (sel.isEmpty()) "Chơi" else label(sel)
+    // Nền mờ dựng sẵn của icon (dùng cho thẻ game), xem softBitmap
+    fun soft(p: String): ImageBitmap? = softs[p]
+        ?: runCatching { softBitmap(pm.getApplicationIcon(p).toBitmap(96, 96)).asImageBitmap() }.getOrNull()?.also { softs[p] = it }
     fun icon(p: String): ImageBitmap? = icons[p] ?: runCatching { pm.getApplicationIcon(p).toBitmap(192, 192).asImageBitmap() }.getOrNull()?.also { icons[p] = it }
 
     // Điểm hiệu năng 0..100 từ RAM, CPU và nhiệt độ

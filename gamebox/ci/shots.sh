@@ -20,6 +20,7 @@ game() { adb shell am start -S -W -n $P/.MainActivity "$@" >/dev/null; }
 adb shell wm size 720x1600
 adb shell wm density 320
 adb shell wm size
+bash "$(dirname "$0")/fps.sh"
 hub --ei tab 1;                 shot hub_home 10
 hub --ei tab 0;                 shot hub_profile
 hub --ei tab 2 --ei opt 0;      shot hub_map

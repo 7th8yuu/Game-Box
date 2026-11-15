@@ -121,7 +121,8 @@ fun HomePage(gs: Gs, goProfile: () -> Unit) {
         } else {
             val p = recent.packageName; val ic = gs.icon(p); val sh = RoundedCornerShape(28.dp)
             Box(Modifier.fillMaxWidth().height(210.dp).enter(120).clip(sh).border(1.dp, Color.White.copy(.15f), sh)) {
-                if (ic != null) Image(ic, null, Modifier.fillMaxSize().blur(30.dp), contentScale = ContentScale.Crop, alpha = .55f)
+                val sb = remember(p) { gs.soft(p) }
+                if (sb != null) Image(sb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = .55f, filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.55f), Color.Transparent))))
                 Column(Modifier.fillMaxHeight().padding(22.dp)) {
                     Text("CHƠI GẦN ĐÂY", fontSize = 11.sp, letterSpacing = 3.sp, color = Cy)

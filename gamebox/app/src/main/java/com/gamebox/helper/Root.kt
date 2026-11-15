@@ -43,7 +43,7 @@ object Rt {
 
     fun sh(vararg c: String): List<String> = when (backend) {
         "root" -> Shell.cmd(*c).exec().out
-        "shizuku" -> c.flatMap { exec1(it) }
+        "shizuku" -> exec1("{\n" + c.joinToString("\n") + "\n} 2>/dev/null")
         else -> emptyList()
     }
 
@@ -159,16 +159,50 @@ object Rt {
         )
     }
 
-    // FPS từ SurfaceFlinger --latency của game đang chạy (game phải mở từ app này)
+    // FPS từ SurfaceFlinger --latency. Một game có vài layer (cửa sổ, SurfaceView, "Background for ..."),
+    // nên đo mọi layer thuộc gói rồi lấy layer có nhịp khung hình cao nhất; bỏ layer nền/viền không có khung.
+    private val lastTs = HashMap<String, Pair<Long, Long>>() // layer -> (mốc khung cuối, lúc mốc đó đổi lần cuối)
+
     fun fps(): Int {
-        if (pkg.isBlank()) return 0
+        val p = pkg
+        if (p.isBlank()) return 0
         val o = sh(
-            "L=\$(dumpsys SurfaceFlinger --list | grep -m1 \"SurfaceView.*$pkg\"); [ -z \"\$L\" ] && L=\$(dumpsys SurfaceFlinger --list | grep -m1 \"$pkg\"); dumpsys SurfaceFlinger --latency \"\$L\""
+            "dumpsys SurfaceFlinger --list | grep -F \"$p\" | grep -v -e '^Background for' -e '^Bounds for' | head -n 8 | " +
+                "while IFS= read -r L; do echo \"@@\$L\"; dumpsys SurfaceFlinger --latency \"\$L\"; done"
         )
-        val t = o.drop(1).mapNotNull { it.trim().split(Regex("\\s+")).getOrNull(1)?.toLongOrNull() }
-            .filter { it > 0 && it < Long.MAX_VALUE / 2 }
-        if (t.size < 2) return 0
-        val last = t.max()
-        return t.count { it > last - 1_000_000_000L }
+        return parseFps(o)
+    }
+
+    // Đầu vào: các khối "@@<tên layer>", dòng đầu là chu kỳ làm mới, các dòng sau gồm 3 mốc thời gian (ns); cột 2 = lúc hiển thị thật.
+    // Layer không có khung mới suốt hơn 2 giây (game tạm dừng) tính là 0. Có thể gọi từ nhiều luồng nên đồng bộ.
+    @Synchronized
+    fun parseFps(o: List<String>): Int {
+        val now = android.os.SystemClock.elapsedRealtime()
+        var best = 0
+        var name = ""
+        var ts = ArrayList<Long>()
+        fun flush() {
+            if (name.isEmpty() || ts.size < 2) { ts = ArrayList(); return }
+            val last = ts.max()
+            val prev = lastTs[name]
+            if (prev == null || prev.first != last) lastTs[name] = last to now
+            else if (now - prev.second > 2000L) { ts = ArrayList(); return }
+            val win = ts.filter { it > last - 1_000_000_000L }.sorted()
+            val span = win.last() - win.first()
+            val f = if (win.size >= 3 && span > 200_000_000L) ((win.size - 1) * 1e9 / span).toInt() else win.size
+            if (f > best) best = f
+            ts = ArrayList()
+        }
+        for (raw in o) {
+            val l = raw.trim()
+            if (l.startsWith("@@")) { flush(); name = l.substring(2); continue }
+            val c = l.split(Regex("\\s+"))
+            if (c.size >= 3) {
+                val t = c[1].toLongOrNull() ?: continue
+                if (t > 0L && t < Long.MAX_VALUE / 2) ts.add(t)
+            }
+        }
+        flush()
+        return best.coerceIn(0, 240)
     }
 }

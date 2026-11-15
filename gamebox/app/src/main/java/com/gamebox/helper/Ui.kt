@@ -1,5 +1,6 @@
 package com.gamebox.helper
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -82,6 +84,52 @@ fun readBat(ctx: Context): Bat {
 
 fun f1(x: Double): String = String.format(Locale.US, "%.1f", x)
 
+// Kính mờ (blur nền sau thẻ) khá nặng trên máy yếu: mặc định chỉ bật khi máy có đủ RAM, người dùng đổi được trong trang Đồ họa
+var GlassOn by mutableStateOf(true)
+
+fun defaultGlass(): Boolean = android.os.Build.VERSION.SDK_INT >= 31 && Rt.mem().first >= 5_000_000L
+
+// Giới hạn giao diện ở 60Hz: máy 90/120Hz sẽ hạ tần số quét khi app ở phía trước, animation đều hơn và đỡ tốn GPU
+@Suppress("DEPRECATION")
+fun cap60(a: Activity) {
+    runCatching {
+        val d = a.windowManager.defaultDisplay
+        val cur = d.mode
+        val m = d.supportedModes
+            .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight && it.refreshRate in 59f..61.5f }
+            .minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
+        val lp = a.window.attributes
+        lp.preferredRefreshRate = 60f
+        if (m != null) lp.preferredDisplayModeId = m.modeId
+        a.window.attributes = lp
+    }
+}
+
+// Ảnh mờ dựng sẵn từ icon: thu nhỏ rồi làm mờ hộp vài lượt trên ảnh bé, vẽ phóng to bằng bộ lọc song tuyến.
+// Dựng một lần, rẻ hơn Modifier.blur (phải chạy lại trên GPU mỗi khung hình khi cuộn).
+fun softBitmap(src: android.graphics.Bitmap): android.graphics.Bitmap {
+    val n = 36
+    val b = android.graphics.Bitmap.createScaledBitmap(src, n, n, true).copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+    val px = IntArray(n * n); b.getPixels(px, 0, n, 0, 0, n, n)
+    val tmp = IntArray(n * n)
+    fun pass(a: IntArray, o: IntArray, horiz: Boolean) {
+        val r = 3
+        for (y in 0 until n) for (x in 0 until n) {
+            var sa = 0; var sr = 0; var sg = 0; var sb = 0; var c = 0
+            for (k in -r..r) {
+                val xx = if (horiz) (x + k).coerceIn(0, n - 1) else x
+                val yy = if (horiz) y else (y + k).coerceIn(0, n - 1)
+                val v = a[yy * n + xx]
+                sa += v ushr 24; sr += (v shr 16) and 255; sg += (v shr 8) and 255; sb += v and 255; c++
+            }
+            o[y * n + x] = ((sa / c) shl 24) or ((sr / c) shl 16) or ((sg / c) shl 8) or (sb / c)
+        }
+    }
+    repeat(2) { pass(px, tmp, true); pass(tmp, px, false) }
+    b.setPixels(px, 0, n, 0, 0, n, n)
+    return b
+}
+
 // ---------- Hiệu ứng ----------
 
 // Nhấn thì co lại rồi bật về (đặt trước clip/background để cả khối co theo)
@@ -108,26 +156,38 @@ fun Modifier.enter(delayMs: Int = 0): Modifier = composed {
 }
 
 @Composable
-fun animInt(v: Int): Int { val a by animateIntAsState(v, tween(600), label = "n"); return a }
+fun animInt(v: Int): Int { val a by animateIntAsState(v, tween(250), label = "n"); return a }
 
 @Composable
-fun animF(v: Float): Float { val a by animateFloatAsState(v, tween(600), label = "f"); return a }
+fun animF(v: Float): Float { val a by animateFloatAsState(v, tween(350), label = "f"); return a }
 
 // ---------- Nền ----------
 
-// Nền có ba đốm sáng trôi chậm; đây cũng là nguồn blur cho các thẻ kính
+// Nền: lớp gradient tĩnh là nguồn blur cho thẻ kính (không đổi nên blur không phải tính lại mỗi khung),
+// ba đốm sáng trôi chậm nằm trên lớp đó. Mỗi đốm là một layer dựng sẵn, chỉ dịch chuyển bằng graphicsLayer
+// nên mỗi khung chỉ đổi thuộc tính layer, không vẽ lại gradient.
 @Composable
 fun LiveBackdrop(hz: HazeState, live: Boolean) {
-    val t = rememberInfiniteTransition(label = "bd").animateFloat(0f, 1f, infiniteRepeatable(tween(20000, easing = LinearEasing)), label = "bdt")
-    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF0A1118), Color(0xFF17140F)))).hazeSource(hz)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val a = if (live) t.value * 6.2831855f else 0f
-            fun blob(c: Color, cx: Float, cy: Float, r: Float) =
-                drawCircle(Brush.radialGradient(listOf(c, Color.Transparent), Offset(cx, cy), r), r, Offset(cx, cy))
-            blob(Color(0xFF8A5A1E).copy(.5f), size.width * (.85f + .06f * sin(a)), size.height * (.1f + .08f * cos(a)), size.height * .9f)
-            blob(Cy.copy(.28f), size.width * (.12f + .06f * cos(a)), size.height * (.95f + .06f * sin(a)), size.height * .8f)
-            blob(Color(0xFF6D4AFF).copy(.16f), size.width * (.5f + .1f * sin(a * 2f)), size.height * .5f, size.height * .7f)
+    val t = rememberInfiniteTransition(label = "bd").animateFloat(0f, 1f, infiniteRepeatable(tween(24000, easing = LinearEasing)), label = "bdt")
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = maxWidth; val h = maxHeight
+        Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF0A1118), Color(0xFF17140F)))).hazeSource(hz))
+        @Composable
+        fun Blob(c: Color, r: Dp, cx: Float, cy: Float, ax: Float, ay: Float, k: Int) {
+            Box(
+                Modifier.size(r * 2).offset(w * cx - r, h * cy - r)
+                    .graphicsLayer {
+                        if (live) {
+                            val a = t.value * 6.2831855f * k
+                            translationX = (w * ax).toPx() * cos(a); translationY = (h * ay).toPx() * sin(a)
+                        }
+                    }
+                    .background(Brush.radialGradient(listOf(c, Color.Transparent)))
+            )
         }
+        Blob(Color(0xFF8A5A1E).copy(.5f), h * .9f, .85f, .1f, .06f, .08f, 1)
+        Blob(Cy.copy(.28f), h * .8f, .12f, .95f, .06f, .06f, 1)
+        Blob(Color(0xFF6D4AFF).copy(.16f), h * .7f, .5f, .5f, .1f, 0f, 2)
     }
 }
 
@@ -137,9 +197,12 @@ fun LiveBackdrop(hz: HazeState, live: Boolean) {
 @Composable
 fun GCard(hz: HazeState, mod: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val s = RoundedCornerShape(24.dp)
+    // Tắt kính mờ: nền bán trong suốt phẳng, không tốn GPU cho blur
+    val fx = if (GlassOn) Modifier.hazeEffect(hz) { backgroundColor = Bg; blurRadius = 20.dp; tints = listOf(HazeTint(Color(0xFF0C1620).copy(.55f))) }
+    else Modifier.background(Brush.verticalGradient(listOf(Color(0xE60F1C28), Color(0xE60B141D))))
     Column(
         mod.clip(s)
-            .hazeEffect(hz) { backgroundColor = Bg; blurRadius = 24.dp; tints = listOf(HazeTint(Color(0xFF0C1620).copy(.55f))) }
+            .then(fx)
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(.35f), Color.White.copy(.05f), Color.White.copy(.15f))), s)
             .padding(14.dp),
         content = content
