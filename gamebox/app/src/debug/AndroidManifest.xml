@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application>
+        <!-- Chỉ bản debug: nối Rt.exec tới ShellServer của CI để chạy trọn luồng như khi có Shizuku -->
+        <provider android:name="com.gamebox.helper.BridgeInit" android:authorities="com.gamebox.helper.bridge"
+            android:exported="false" android:initOrder="100"/>
         <!-- Chỉ bản debug: "game" giả (GLSurfaceView) để CI thử đo FPS trên layer SurfaceView như game thật -->
         <activity android:name="com.gamebox.helper.SimActivity" android:exported="true"
             android:theme="@android:style/Theme.Material.NoActionBar"/>

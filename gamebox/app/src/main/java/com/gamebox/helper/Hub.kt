@@ -79,6 +79,11 @@ class HubActivity : ComponentActivity() {
         // Chỉ bản debug: CI mở thẳng một bài kiểm tra cảm ứng để chụp
         if (dbg && intent.hasExtra("lab")) g.labKind = intent.getIntExtra("lab", -1)
         if (dbg && intent.getBooleanExtra("diag", false)) g.diagOpen = true
+        // Chỉ bản debug: CI mô phỏng người dùng chọn game, đặt mức giảm độ phân giải rồi bấm Chơi
+        intent.getStringExtra("play")?.takeIf { dbg }?.let { pkg ->
+            g.select(pkg); g.s("res", intent.getIntExtra("res", 60)); g.s("texm", 0)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ g.play() }, 2500)
+        }
         setContent { HubApp(g, tab0, opt0, act0) }
     }
 }

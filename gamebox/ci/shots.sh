@@ -20,6 +20,7 @@ game() { adb shell am start -S -W -n $P/.MainActivity "$@" >/dev/null; }
 bash "$(dirname "$0")/wm.sh" 2>&1
 bash "$(dirname "$0")/fps.sh"
 bash "$(dirname "$0")/probe2.sh" 2>&1
+bash "$(dirname "$0")/probe3.sh" 2>&1
 # Giả lập kích thước gần máy thật (720x1600, 360dp ngang) để bố cục giống điện thoại
 adb shell wm size 720x1600
 adb shell wm density 320

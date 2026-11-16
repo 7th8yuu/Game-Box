@@ -323,7 +323,12 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
             // Cách "Cả màn hình": hạ wm size trước khi mở game để game khởi động đã ở độ phân giải mới.
             // Nếu không đổi được thì rơi về Game Mode.
             var gmRes = res
-            if (res < 95 && screenWide) { if (Wm.apply(sp, res)) { gmRes = 100; Thread.sleep(700) } }
+            if (res < 95 && screenWide) {
+                if (Wm.apply(sp, res)) { gmRes = 100; Thread.sleep(700) }
+                // Báo ngay kết quả (hiện được cả khi game đã mở) để biết độ phân giải có thật sự bị hạ không
+                val msg = Wm.lastMsg
+                if (msg.isNotEmpty()) Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
+            }
             Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
             if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {

@@ -26,6 +26,8 @@ object Rt {
     )
 
     fun init(): String {
+        // Cầu nối shell của CI (debug/Bridge.kt) coi như đã có quyền shell, giống Shizuku
+        if (exec != null) { backend = "shizuku"; if (since == 0L) since = android.os.SystemClock.elapsedRealtime(); return backend }
         backend = when {
             Shell.getShell().isRoot -> "root"
             runCatching { Shizuku.pingBinder() }.getOrDefault(false) -> {

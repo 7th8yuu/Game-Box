@@ -42,25 +42,45 @@ object Wm {
 
     fun logText(sp: SharedPreferences): String = sp.getString("wm_log", "") ?: ""
 
+    // Kết quả lần áp gần nhất bằng lời, hiện thành thông báo ngay khi bấm Chơi để biết đã hạ được hay chưa
+    @Volatile var lastMsg = ""
+
+    private fun fail(sp: SharedPreferences, why: String): Boolean {
+        lastMsg = "Không hạ được độ phân giải: $why"
+        log(sp, lastMsg)
+        return false
+    }
+
     // Trả về true nếu đã đổi độ phân giải và đọc lại thấy đúng. pct >= 95 thì không đổi gì
     fun apply(sp: SharedPreferences, pct: Int): Boolean {
+        lastMsg = ""
         if (pct >= 95) return false
-        if (Rt.backend == "none") { log(sp, "bỏ qua: chưa có quyền Root/Shizuku"); return false }
-        val i = read()
-        if (i == null) { log(sp, "bỏ qua: không đọc được wm size/density"); return false }
+        if (Rt.backend == "none") return fail(sp, "chưa có quyền Root/Shizuku")
+        val i = read() ?: return fail(sp, "không đọc được kích thước màn hình (wm size)${Rt.lastErr.let { if (it.isEmpty()) "" else " · $it" }}")
         if (!sp.getBoolean("wm_on", false)) {
             // Lưu giá trị gốc (0x0 / 0 = mặc định của máy) trước khi đổi lần đầu
             sp.edit().putBoolean("wm_on", true).putString("wm_o", "${i.ow}x${i.oh}|${i.od}").apply()
         }
         val (w, h, d) = target(i, pct)
         Rt.sh("wm size ${w}x$h", "wm density $d")
-        Thread.sleep(300)
-        // Đọc lại để biết lệnh có thật sự có hiệu lực (một số máy từ chối âm thầm)
-        val j = read()
-        val ok = j != null && j.ow == w && j.oh == h
+        // Đọc lại để biết lệnh có thật sự có hiệu lực (một số máy từ chối âm thầm hoặc áp chậm nên thử hai lần)
+        var j: Info? = null
+        var ok = false
+        for (n in 0 until 2) {
+            Thread.sleep(if (n == 0) 300L else 700L)
+            j = read()
+            ok = j != null && j.ow == w && j.oh == h
+            if (ok) break
+        }
         log(sp, "áp $pct%: ${i.pw}x${i.ph}/${i.pd} -> ${w}x$h/$d, đọc lại ${j?.let { "${it.ow}x${it.oh}/${it.od}" } ?: "lỗi"} ${if (ok) "ĐÚNG" else "KHÔNG KHỚP"}")
-        if (ok) sp.edit().putString("wm_t", "${w}×$h").apply() else restore(sp, "áp không có hiệu lực")
-        return ok
+        if (ok) {
+            sp.edit().putString("wm_t", "${w}×$h").apply()
+            lastMsg = "Đã hạ độ phân giải xuống ${w}×$h ($pct%)"
+            return true
+        }
+        restore(sp, "áp không có hiệu lực")
+        lastMsg = "Không hạ được độ phân giải: máy không nhận lệnh (đọc lại ${j?.let { if (it.ow > 0) "${it.ow}x${it.oh}" else "vẫn mặc định" } ?: "lỗi"})"
+        return false
     }
 
     // Trả lại độ phân giải gốc nếu app đã đổi nó. Không có quyền thì giữ cờ để lần sau thử lại
