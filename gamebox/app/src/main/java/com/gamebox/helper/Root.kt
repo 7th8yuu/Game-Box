@@ -117,8 +117,9 @@ object Rt {
         val m = if (gm == 0 && (ds != "disable" || fp != "disable")) 1 else gm
         if (m != 0) {
             val name = arrayOf("standard", "performance", "battery")[m]
-            // "set" chỉ ghi cấu hình; "mode" mới kích hoạt chế độ cho game
-            sh("cmd game set --mode $name --downscale $ds --fps $fp $p", "cmd game mode $name $p")
+            // "set --mode" đòi số (1 chuẩn, 2 hiệu năng, 3 tiết kiệm) và chỉ ghi cấu hình; "mode" mới kích hoạt cho game.
+            // "set" phải chạy trước vì nó làm chế độ đó trở thành "được hỗ trợ" cho game.
+            sh("cmd game set --mode ${m + 1} --downscale $ds --fps $fp $p", "cmd game mode $name $p")
         }
         if (hz > 0) sh("settings put system peak_refresh_rate $hz", "settings put system min_refresh_rate $hz")
         if (sat != 1f) sh("service call SurfaceFlinger 1022 f $sat")

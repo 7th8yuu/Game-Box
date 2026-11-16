@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Thử đúng lệnh đo FPS của Rt.fps() trên emulator. Dùng chính app làm "game" vì nền động luôn vẽ lại.
+# Thử đúng lệnh đo FPS của Rt.fps() trên emulator. Dùng trang Tối ưu game của app (cuộn được) làm "game".
 P=com.gamebox.helper
-adb shell am start -S -W -n $P/.MainActivity >/dev/null
-sleep 8
-# Vuốt liên tục trong nền để app có khung hình thật (app đứng yên thì không sinh khung nên FPS = 0 là đúng)
-adb shell "input swipe 900 300 100 300 6000" &
-sleep 1
+adb shell am start -S -W -n $P/.HubActivity --ei tab 2 --ei opt 0 >/dev/null
+sleep 6
+# Vuốt chậm liên tục trong nền để app sinh khung hình thật (app đứng yên thì không có khung, FPS = 0 là đúng)
+adb shell "input swipe 160 500 160 100 9000" &
+sleep 1.5
 echo "FPS_PROBE layers:"
 adb shell "dumpsys SurfaceFlinger --list | grep -F $P"
 CMD='dumpsys SurfaceFlinger --list | grep -F "'$P'" | grep -v -e "^Background for" -e "^Bounds for" | head -n 8 | while IFS= read -r L; do echo "@@$L"; dumpsys SurfaceFlinger --latency "$L"; done'
@@ -37,6 +37,5 @@ for raw in open('/tmp/fps%s.txt' % i, errors='ignore'):
 flush()
 print('FPS_PROBE run', i, 'best =', best, 'layers =', out)
 PY
-  sleep 1
+  sleep 1.2
 done
-head -4 /tmp/fps1.txt

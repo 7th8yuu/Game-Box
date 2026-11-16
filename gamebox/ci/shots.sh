@@ -16,12 +16,13 @@ PY
 }
 hub()  { adb shell am start -S -W -n $P/.HubActivity "$@" >/dev/null; }
 game() { adb shell am start -S -W -n $P/.MainActivity "$@" >/dev/null; }
+# Các bài thử lệnh hệ thống chạy trước khi giả lập kích thước máy (vì wm.sh tự đổi và trả lại wm size)
+bash "$(dirname "$0")/wm.sh" 2>&1
+bash "$(dirname "$0")/fps.sh"
 # Giả lập kích thước gần máy thật (720x1600, 360dp ngang) để bố cục giống điện thoại
 adb shell wm size 720x1600
 adb shell wm density 320
 adb shell wm size
-bash "$(dirname "$0")/wm.sh" 2>&1
-bash "$(dirname "$0")/fps.sh"
 hub --ei tab 1;                 shot hub_home 10
 hub --ei tab 0;                 shot hub_profile
 hub --ei tab 2 --ei opt 0;      shot hub_map
