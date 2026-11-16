@@ -85,12 +85,12 @@ fun DiagDialog(gs: Gs, close: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostBtn("Làm mới", Modifier.weight(1f)) { tick++ }
-                GhostBtn("Sao chép", Modifier.weight(1f)) {
+                GhostBtn("Sao chép", Modifier.weight(1.2f)) {
                     val cm = gs.ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("Game Box chẩn đoán", text))
                     android.widget.Toast.makeText(gs.ctx, "Đã sao chép", android.widget.Toast.LENGTH_SHORT).show()
                 }
-                PrimaryBtn("Đóng", Modifier.weight(1f), onClick = close)
+                PrimaryBtn("Đóng", Modifier.weight(.8f), onClick = close)
             }
         }
     }
