@@ -30,6 +30,7 @@ hub --ei tab 2 --ei opt 0;      shot hub_map
 hub --ei tab 2 --ei opt 1;      shot hub_touch
 hub --ei tab 2 --ei opt 2;      shot hub_fix
 hub --ei tab 1 --ez act true;   shot hub_act
+hub --ei tab 1 --ez diag true;  shot hub_diag 6
 for k in 0 1 2 3 4; do hub --ei tab 2 --ei opt 1 --ei lab $k; shot lab_$k 4; done
 game --ei page 0;               shot gs_games 9
 game --ei page 1;               shot gs_perf

@@ -78,6 +78,7 @@ class HubActivity : ComponentActivity() {
         val act0 = dbg && intent.getBooleanExtra("act", false)
         // Chỉ bản debug: CI mở thẳng một bài kiểm tra cảm ứng để chụp
         if (dbg && intent.hasExtra("lab")) g.labKind = intent.getIntExtra("lab", -1)
+        if (dbg && intent.getBooleanExtra("diag", false)) g.diagOpen = true
         setContent { HubApp(g, tab0, opt0, act0) }
     }
 }
@@ -210,6 +211,7 @@ fun HubApp(gs: Gs, initTab: Int = 1, initOpt: Int = 0, initAct: Boolean = false)
                 ) { ActivationCenter(gs) { act = false } }
                 if (settings) HubSettings(gs) { settings = false }
                 LabScreen(gs)
+                if (gs.diagOpen) DiagDialog(gs) { gs.diagOpen = false }
             }
         }
     }
@@ -377,9 +379,7 @@ fun HubSettings(gs: Gs, close: () -> Unit) {
             SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.putLive(it) }
             SwRow("Bảng điều khiển trong game", "Hiện nút nổi khi chơi từ Game Box", gs.ov) { gs.putOv(it) }
             Spacer(Modifier.height(6.dp))
-            var diag by remember { mutableStateOf(false) }
-            GhostBtn("Chẩn đoán lỗi", Modifier.fillMaxWidth(), icon = Ic.Tune) { diag = true }
-            if (diag) DiagDialog(gs) { diag = false }
+            GhostBtn("Chẩn đoán lỗi", Modifier.fillMaxWidth(), icon = Ic.Tune) { gs.diagOpen = true }
             Spacer(Modifier.height(8.dp))
             GhostBtn("Khôi phục độ phân giải màn hình", Modifier.fillMaxWidth(), icon = Ic.Reset) {
                 kotlin.concurrent.thread { Wm.forceReset(gs.sp) }
