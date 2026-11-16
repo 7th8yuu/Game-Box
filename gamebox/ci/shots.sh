@@ -32,6 +32,7 @@ game --ei page 0;               shot gs_games 9
 game --ei page 1;               shot gs_perf
 game --ei page 2;               shot gs_bat
 game --ei page 3;               shot gs_gfx
+game --ei page 0 --ez tex true; shot gs_tex 8
 # Overlay: nút nổi, thanh dính mép, bảng trượt ra (cần quyền vẽ đè đã cấp ở bước trước)
 game --ei page 0 --ez smoke_overlay true --ei ov_dock 0 --ez ov_open false;  shot ov_float 9
 game --ei page 1 --ez smoke_overlay true --ei ov_dock 1 --ez ov_open false;  shot ov_dock_left

@@ -84,6 +84,8 @@ class MainActivity : ComponentActivity() {
         val g = Gs(this, sp)
         g.page = intent.getIntExtra("page", 0).coerceIn(0, 3)
         intent.getStringExtra("game")?.let { g.select(it) }
+        // Chỉ bản debug: smoke test CI mở thẳng màn hình Kết cấu để chụp
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent.getBooleanExtra("tex", false)) g.tex = true
         gs = g
         setContent { GameSpaceApp(g) }
     }
