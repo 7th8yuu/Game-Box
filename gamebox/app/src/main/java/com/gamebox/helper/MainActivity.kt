@@ -104,6 +104,8 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     val hz = HazeState()
     var page by mutableIntStateOf(0)
     var tex by mutableStateOf(false)
+    val lab = LabState()
+    var labKind by mutableIntStateOf(-1) // bài kiểm tra cảm ứng đang mở toàn màn hình (-1 = không)
     var menu by mutableStateOf(false)
 
     // Mọi ứng dụng mở được, và danh sách game tự nhận diện (dùng khi người dùng chưa tự chọn thư viện)
@@ -173,18 +175,18 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         GlassOn = sp.getBoolean("glass", defaultGlass())
         // Phiên trước còn dang dở (app bị tắt giữa chừng): trả lại cài đặt để game mở ngoài app chạy bình thường
         val pend = sp.getString("sess", "") ?: ""
-        if (pend.isNotEmpty() && !Overlay.alive) {
+        if ((pend.isNotEmpty() || sp.getBoolean("wm_on", false)) && !Overlay.alive) {
             sp.edit().remove("sess").apply()
-            thread { Rt.init(); Rt.restore(pend); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+            thread { Rt.init(); Rt.restore(pend); Wm.restore(sp); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
         }
     }
 
     fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
     fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
-    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb").forEach { unset(it) } }
+    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").forEach { unset(it) } }
     fun custom(p: String): Boolean =
-        cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb").any { sp.contains("${it}_$p") }
+        cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
 
     val profiles = mutableStateListOf<Prof>().apply {
         runCatching {
@@ -201,7 +203,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         sp.edit().putString("profiles", a.toString()).apply()
     }
     fun addProfile() {
-        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texd" to 0, "texb" to 0)
+        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texd" to 0, "texb" to 0, "texm" to 0)
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
         profiles.add(0, Prof("$selName · $stamp", sel, keys.mapValues { (k, d) -> g(k, d) }))
         saveProfiles()
@@ -274,27 +276,42 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     fun play() {
         val p = sel; if (p.isEmpty()) return
+        // Chưa có quyền vẽ đè thì xin trước, chưa áp dụng gì cả để không phải hoàn tác
+        if (ov && !Settings.canDrawOverlays(ctx)) {
+            thread {
+                // Thử cấp quyền vẽ đè bằng root/Shizuku; nếu vẫn thiếu thì mở trang cấp quyền, không mở game
+                Rt.grant(ctx.packageName)
+                Handler(Looper.getMainLooper()).post {
+                    if (Settings.canDrawOverlays(ctx)) start(p, true)
+                    else {
+                        Toast.makeText(ctx, "Hãy bật \"Hiển thị trên ứng dụng khác\" cho Game Box rồi bấm Chơi lại", Toast.LENGTH_LONG).show()
+                        ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
+                    }
+                }
+            }
+        } else start(p, ov)
+    }
+
+    // Áp dụng cài đặt cho game rồi mới mở game. Mọi thay đổi chỉ tồn tại trong phiên này: cờ "sess" cho phép
+    // dịch vụ, nút Thoát hoặc lần mở app sau trả lại như cũ, nên game mở ngoài app vẫn chạy bình thường.
+    private fun start(p: String, withOverlay: Boolean) {
         Rt.pkg = p
+        sp.edit().putString("sess", p).apply()
         val gm = g("gm", 0); val res = g("res", 100); val fps = listOf(30, 45, 60, 90, 120, 0)[g("fps", 5)]
         val hzv = g("hz", 0).let { if (it < 30) 0 else it }; val sat = g("sat", 100) / 100f
         val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
-        thread { Rt.applyGame(p, gm, res, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv); if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean() }
-        // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và tự khôi phục cài đặt khi game thoát; ui=false thì không vẽ nút nổi
-        fun launch(withOverlay: Boolean) {
-            sp.edit().putString("sess", p).apply()
-            ctx.startForegroundService(Intent(ctx, Overlay::class.java).putExtra("ui", withOverlay))
-            pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
-        }
-        if (!ov || Settings.canDrawOverlays(ctx)) launch(ov)
-        else thread {
-            // Thử cấp quyền vẽ đè bằng root/Shizuku; nếu vẫn thiếu thì mở trang cấp quyền, không mở game
-            Rt.grant(ctx.packageName)
+        val screenWide = g("texm", 0) == 0
+        thread {
+            // Cách "Cả màn hình": hạ wm size trước khi mở game để game khởi động đã ở độ phân giải mới.
+            // Nếu không đổi được thì rơi về Game Mode.
+            var gmRes = res
+            if (res < 95 && screenWide) { if (Wm.apply(sp, res)) { gmRes = 100; Thread.sleep(700) } }
+            Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
+            if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {
-                if (Settings.canDrawOverlays(ctx)) launch(true)
-                else {
-                    Toast.makeText(ctx, "Hãy bật \"Hiển thị trên ứng dụng khác\" cho Game Box rồi bấm Chơi lại", Toast.LENGTH_LONG).show()
-                    ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
-                }
+                // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và khôi phục khi game thoát; ui=false thì không vẽ nút nổi
+                ctx.startForegroundService(Intent(ctx, Overlay::class.java).putExtra("ui", withOverlay))
+                pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
             }
         }
     }
@@ -303,7 +320,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         val p = Rt.pkg.ifEmpty { sel }; Rt.pkg = ""
         sp.edit().remove("sess").apply()
         ctx.stopService(Intent(ctx, Overlay::class.java))
-        thread { Rt.restore(p); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
+        thread { Rt.restore(p); Wm.restore(sp); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
     }
 }
 

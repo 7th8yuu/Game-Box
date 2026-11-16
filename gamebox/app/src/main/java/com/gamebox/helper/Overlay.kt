@@ -588,7 +588,7 @@ class Overlay : Service() {
         val p = Rt.pkg.ifEmpty { sp.getString("sess", "") ?: "" }
         Rt.pkg = ""
         sp.edit().remove("sess").apply()
-        thread { Rt.restore(p); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+        thread { Rt.restore(p); Wm.restore(sp); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
         stopSelf()
     }
 

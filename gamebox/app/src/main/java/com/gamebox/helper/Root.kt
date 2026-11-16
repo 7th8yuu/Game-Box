@@ -89,6 +89,17 @@ object Rt {
         sh("settings put global game_driver_all_apps ${if (m == 1) 1 else 0}", "setprop debug.hwui.renderer ${if (m == 2) "skiavk" else "''"}")
     }
 
+    // Chỉnh cảm ứng an toàn, hoàn tác được: tần số quét cao nhất, hiệu ứng nhanh 0.5x, tắt tiết kiệm pin, nhấn giữ 300 ms
+    fun touchTweaks(on: Boolean, maxHz: Int) {
+        if (on) {
+            sh("settings put system peak_refresh_rate $maxHz", "settings put system min_refresh_rate $maxHz", "settings put global low_power 0", "settings put secure long_press_timeout 300")
+            anim(1)
+        } else {
+            sh("settings delete system peak_refresh_rate", "settings delete system min_refresh_rate", "settings delete secure long_press_timeout")
+            anim(0)
+        }
+    }
+
     // Tốc độ con trỏ -7..7. Android không có chỉnh độ nhạy cảm ứng chung, chỉ có tác dụng với chuột/tay cầm
     fun pointer(v: Int) { sh("settings put system pointer_speed $v") }
 
@@ -98,18 +109,23 @@ object Rt {
         else sh("pkill -2 screenrecord")
     }
 
-    // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res %, fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc
+    // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res % (chỉ dùng cho cách "Chỉ game"), fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc
     fun applyGame(p: String, gm: Int, res: Int, fps: Int, hz: Int, sat: Float) {
-        val mode = arrayOf("standard", "performance", "battery")[gm]
         val ds = if (res >= 95) "disable" else String.format(Locale.US, "%.2f", (res.coerceAtLeast(30) / 5 * 5) / 100.0)
         val fp = if (fps in listOf(30, 45, 60, 90, 120)) fps.toString() else "disable"
-        sh("cmd game set --mode $mode --downscale $ds --fps $fp $p")
+        // Cấu hình ghi đè (độ phân giải, FPS) chỉ có tác dụng ở chế độ Hiệu năng/Tiết kiệm, nên Chuẩn mà có yêu cầu thì dùng Hiệu năng
+        val m = if (gm == 0 && (ds != "disable" || fp != "disable")) 1 else gm
+        if (m != 0) {
+            val name = arrayOf("standard", "performance", "battery")[m]
+            // "set" chỉ ghi cấu hình; "mode" mới kích hoạt chế độ cho game
+            sh("cmd game set --mode $name --downscale $ds --fps $fp $p", "cmd game mode $name $p")
+        }
         if (hz > 0) sh("settings put system peak_refresh_rate $hz", "settings put system min_refresh_rate $hz")
         if (sat != 1f) sh("service call SurfaceFlinger 1022 f $sat")
     }
 
     fun restore(p: String) {
-        sh("cmd game reset $p", "settings delete system peak_refresh_rate", "settings delete system min_refresh_rate", "service call SurfaceFlinger 1022 f 1.0")
+        sh("cmd game reset $p", "cmd game mode standard $p", "settings delete system peak_refresh_rate", "settings delete system min_refresh_rate", "service call SurfaceFlinger 1022 f 1.0")
         anim(0); msaa(false); driver(0); pointer(0); record(false)
     }
 

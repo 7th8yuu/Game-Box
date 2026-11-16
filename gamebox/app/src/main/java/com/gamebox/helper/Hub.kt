@@ -206,6 +206,7 @@ fun HubApp(gs: Gs, initTab: Int = 1, initOpt: Int = 0, initAct: Boolean = false)
                     exit = slideOutVertically(tween(240)) { it / 3 } + fadeOut(tween(200))
                 ) { ActivationCenter(gs) { act = false } }
                 if (settings) HubSettings(gs) { settings = false }
+                LabScreen(gs)
             }
         }
     }
@@ -372,6 +373,11 @@ fun HubSettings(gs: Gs, close: () -> Unit) {
             }
             SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.putLive(it) }
             SwRow("Bảng điều khiển trong game", "Hiện nút nổi khi chơi từ Game Box", gs.ov) { gs.putOv(it) }
+            Spacer(Modifier.height(6.dp))
+            GhostBtn("Khôi phục độ phân giải màn hình", Modifier.fillMaxWidth(), icon = Ic.Reset) {
+                kotlin.concurrent.thread { Wm.forceReset(gs.sp) }
+                android.widget.Toast.makeText(gs.ctx, "Đã trả độ phân giải về mặc định của máy.", android.widget.Toast.LENGTH_SHORT).show()
+            }
             Spacer(Modifier.height(8.dp))
             PrimaryBtn("Xong", Modifier.fillMaxWidth(), onClick = close)
         }

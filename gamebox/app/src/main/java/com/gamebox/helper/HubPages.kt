@@ -418,6 +418,7 @@ private fun TestRow(ic: Ic, title: String, sub: String, status: String, onClick:
 @Composable
 fun TouchCheckTab(gs: Gs) {
     val ctx = gs.ctx
+    val lab = gs.lab
     val dm = ctx.resources.displayMetrics
     val fingers = when {
         gs.pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN_MULTITOUCH_JAZZHAND) -> "5+"
@@ -434,29 +435,42 @@ fun TouchCheckTab(gs: Gs) {
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Cell("TẦN SỐ QUÉT", "${gs.refresh} Hz", Modifier.weight(1f))
-            Cell("TẦN SỐ LẤY MẪU", "—", Modifier.weight(1f))
+            Cell("TẦN SỐ LẤY MẪU", if (lab.hz > 0) "${lab.hz} Hz" else "—", Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Cell("SỐ NGÓN TỐI ĐA", fingers, Modifier.weight(1f))
+            Cell("SỐ NGÓN TỐI ĐA", if (lab.fingers > 0) "${lab.fingers}" else fingers, Modifier.weight(1f))
             Cell("ĐỘ PHÂN GIẢI", "${maxOf(dm.widthPixels, dm.heightPixels)}×${minOf(dm.widthPixels, dm.heightPixels)}", Modifier.weight(1f))
         }
     }
     Spacer(Modifier.height(20.dp))
     Text("KIỂM TRA MÀN HÌNH", fontSize = 12.sp, letterSpacing = 3.sp, color = Dim)
     Spacer(Modifier.height(10.dp))
-    TestRow(Ic.Grid, "Vùng chết", "Vuốt khắp màn hình để tìm vùng không phản hồi", "Chưa kiểm tra") { soon(ctx) }
-    TestRow(Ic.Target, "Cảm ứng ma", "Không chạm màn hình trong 15 giây", "Chưa kiểm tra") { soon(ctx) }
-    TestRow(Ic.Hand, "Đa điểm", "Đặt càng nhiều ngón tay càng tốt", "Chưa kiểm tra") { soon(ctx) }
-    TestRow(Ic.Refresh, "Tần số lấy mẫu", "Liên tục trượt ngón tay, đo Hz cảm ứng", "Chưa kiểm tra") { soon(ctx) }
-    TestRow(Ic.Pulse, "Độ chính xác / rung", "Vẽ một đường thẳng từ trái sang phải", "Chưa kiểm tra") { soon(ctx) }
+    TestRow(Ic.Grid, "Vùng chết", "Vuốt khắp màn hình để tìm vùng không phản hồi",
+        if (lab.dead < 0) "Chưa kiểm tra" else "${lab.dead}%") { gs.labKind = 0 }
+    TestRow(Ic.Target, "Cảm ứng ma", "Không chạm màn hình trong 15 giây",
+        if (lab.ghost < 0) "Chưa kiểm tra" else if (lab.ghost == 0) "Không có" else "${lab.ghost} lần") { gs.labKind = 1 }
+    TestRow(Ic.Hand, "Đa điểm", "Đặt càng nhiều ngón tay càng tốt",
+        if (lab.fingers < 0) "Chưa kiểm tra" else "${lab.fingers} ngón") { gs.labKind = 2 }
+    TestRow(Ic.Refresh, "Tần số lấy mẫu", "Liên tục trượt ngón tay, đo Hz cảm ứng",
+        if (lab.hz < 0) "Chưa kiểm tra" else "${lab.hz} Hz") { gs.labKind = 3 }
+    TestRow(Ic.Pulse, "Độ chính xác / rung", "Chạm 7 mục tiêu rồi giữ yên ngón tay",
+        if (lab.acc < 0f) "Chưa kiểm tra" else "${f1(lab.acc.toDouble())} mm") { gs.labKind = 4 }
+    if (lab.dead >= 0 && lab.deadNote.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(lab.deadNote, fontSize = 12.sp, color = Dim)
+    }
 }
 
+// Sửa cảm ứng: Đo (phản hồi, trượt) > Tìm lỗi (phân tích) > Sửa (chỉnh an toàn, hoàn tác được) > Đo lại (so sánh)
 @Composable
 fun TouchFixTab(gs: Gs) {
     val ctx = gs.ctx
+    val lab = gs.lab
     val names = listOf("Đo", "Tìm lỗi", "Sửa", "Đo lại")
-    val step = 0
+    var step by remember { mutableIntStateOf(0) }
+    var running by remember { mutableStateOf(false) }
+    var finished by remember { mutableStateOf(false) }
     Panel(Modifier.fillMaxWidth(), pad = 14.dp) {
         Box(Modifier.fillMaxWidth()) {
             Box(Modifier.align(Alignment.TopCenter).padding(top = 17.dp).fillMaxWidth(.75f).height(1.dp).background(Color.White.copy(.15f)))
@@ -477,29 +491,73 @@ fun TouchFixTab(gs: Gs) {
     }
     Spacer(Modifier.height(14.dp))
     Panel(Modifier.fillMaxWidth(), pad = 18.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Vòng chạm", Modifier.weight(1f), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Vòng 1/3", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Cy)
-        }
-        Spacer(Modifier.height(8.dp))
-        Text("3 vòng × 4 lần chạm. Chạm ô sáng nhanh nhất có thể.", fontSize = 13.sp, color = Dim)
-        Spacer(Modifier.height(14.dp))
-        repeat(2) { row ->
-            Row(Modifier.fillMaxWidth().padding(bottom = if (row == 0) 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                repeat(3) {
-                    Box(Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(.04f)).border(1.dp, Color.White.copy(.08f), RoundedCornerShape(16.dp)))
+        when (step) {
+            0, 3 -> {
+                TapMeasure(running) { ms, miss ->
+                    running = false; finished = true
+                    if (step == 0) { lab.beforeMs = ms; lab.beforeMiss = miss } else { lab.afterMs = ms; lab.afterMiss = miss }
                 }
+                Spacer(Modifier.height(16.dp))
+                val done = if (step == 0) lab.beforeMs >= 0 else lab.afterMs >= 0
+                if (!running) PrimaryBtn(if (done) "Đo lại lần nữa" else "Bắt đầu đo", Modifier.fillMaxWidth(), icon = Ic.Play) { running = true; finished = false }
+                else Text("Đang đo… chạm ô sáng", Modifier.fillMaxWidth(), fontSize = 14.sp, color = Cy, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Spacer(Modifier.height(12.dp))
+                val ms = if (step == 0) lab.beforeMs else lab.afterMs
+                val miss = if (step == 0) lab.beforeMiss else lab.afterMiss
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.04f)).padding(12.dp)) {
+                        Text("PHẢN HỒI TB", Modifier.weight(1f), fontSize = 10.sp, letterSpacing = 1.5.sp, color = Dim)
+                        Text(if (ms < 0) "—" else "$ms ms", fontWeight = FontWeight.Bold)
+                    }
+                    Row(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.04f)).padding(12.dp)) {
+                        Text("TRƯỢT", Modifier.weight(1f), fontSize = 10.sp, letterSpacing = 1.5.sp, color = Dim)
+                        Text(if (miss < 0) "0" else "$miss", fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (step == 3 && lab.beforeMs >= 0 && lab.afterMs >= 0) {
+                    Spacer(Modifier.height(12.dp))
+                    val d = lab.beforeMs - lab.afterMs
+                    Text(
+                        "Trước: ${lab.beforeMs} ms, ${lab.beforeMiss} trượt · Sau: ${lab.afterMs} ms, ${lab.afterMiss} trượt. " +
+                            if (d > 15) "Phản hồi nhanh hơn khoảng $d ms." else if (d < -15) "Chậm hơn ${-d} ms, có thể do sai số ngón tay; thử đo lại." else "Gần như không đổi.",
+                        fontSize = 13.sp, color = Dim
+                    )
+                }
+                if (step == 0 && lab.beforeMs >= 0 && !running) { Spacer(Modifier.height(12.dp)); GhostBtn("Tìm lỗi", Modifier.fillMaxWidth()) { step = 1 } }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        PrimaryBtn("Bắt đầu đo", Modifier.fillMaxWidth(), icon = Ic.Play) { soon(ctx) }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.04f)).padding(12.dp)) {
-                Text("PHẢN HỒI TB", Modifier.weight(1f), fontSize = 10.sp, letterSpacing = 1.5.sp, color = Dim); Text("—", fontWeight = FontWeight.Bold)
+            1 -> {
+                Text("Kết quả phân tích", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                val issues = remember(lab.beforeMs, lab.beforeMiss, lab.dead, lab.ghost, lab.hz, lab.acc, lab.jit) {
+                    buildList {
+                        if (lab.beforeMs > 320) add("Phản hồi chậm (${lab.beforeMs} ms). Thường do máy đang nóng/đầy RAM hoặc hiệu ứng hệ thống nặng.")
+                        if (lab.beforeMiss >= 3) add("Hay chạm trượt ô (${lab.beforeMiss} lần). Kiểm tra miếng dán màn hình hoặc tay ướt/bẩn.")
+                        if (lab.dead in 0..94) add("Có vùng không phản hồi (${lab.dead}% màn hình). Lỗi phần cứng thì phần mềm không sửa được, chỉ loại trừ được nguyên nhân do miếng dán/ốp.")
+                        if (lab.ghost > 0) add("Có ${lab.ghost} lần chạm ma. Thử rút sạc và tháo ốp, nếu vẫn còn thì nghi ngờ phần cứng.")
+                        if (lab.hz in 1..89) add("Tần số lấy mẫu thấp (${lab.hz} Hz), vuốt có thể kém mượt.")
+                        if (lab.acc > 4f) add("Chạm lệch trung bình ${f1(lab.acc.toDouble())} mm.")
+                        if (lab.jit > 1.3f) add("Ngón giữ yên vẫn rung ${f1(lab.jit.toDouble())} mm: nghi nhiễu cảm ứng.")
+                    }
+                }
+                if (lab.beforeMs < 0) Text("Hãy đo ở bước 1 trước.", fontSize = 13.sp, color = Dim)
+                else if (issues.isEmpty()) Text("Không thấy lỗi rõ ràng từ các phép đo hiện có. Có thể chạy thêm các bài ở tab Kiểm tra cảm ứng để phân tích đầy đủ hơn.", fontSize = 13.sp, color = Dim)
+                else issues.forEach { Text("• $it", fontSize = 13.sp, color = Color.White.copy(.85f), modifier = Modifier.padding(bottom = 6.dp)) }
+                Spacer(Modifier.height(10.dp))
+                PrimaryBtn("Sang bước Sửa", Modifier.fillMaxWidth()) { step = 2 }
             }
-            Row(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.04f)).padding(12.dp)) {
-                Text("TRƯỢT", Modifier.weight(1f), fontSize = 10.sp, letterSpacing = 1.5.sp, color = Dim); Text("0", fontWeight = FontWeight.Bold)
+            2 -> {
+                Text("Chỉnh an toàn", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text("Chỉ gồm các chỉnh có thể hoàn tác: tần số quét tối đa, hiệu ứng hệ thống nhanh hơn, tắt tiết kiệm pin và rút ngắn thời gian nhấn giữ. Không sửa được lỗi phần cứng.", fontSize = 13.sp, color = Dim)
+                Spacer(Modifier.height(14.dp))
+                PrimaryBtn(if (lab.applied) "Đã áp dụng" else "Áp dụng", Modifier.fillMaxWidth(), icon = Ic.Check) {
+                    if (gs.be == "none") Toast.makeText(ctx, "Cần cấp quyền Root hoặc Shizuku trong Trung tâm kích hoạt.", Toast.LENGTH_LONG).show()
+                    else { lab.applied = true; val hz = gs.hzs.maxOrNull() ?: 60; kotlin.concurrent.thread { Rt.touchTweaks(true, hz) } }
+                }
+                Spacer(Modifier.height(10.dp))
+                GhostBtn("Hoàn tác", Modifier.fillMaxWidth(), icon = Ic.Reset) { lab.applied = false; kotlin.concurrent.thread { Rt.touchTweaks(false, 60) } }
+                Spacer(Modifier.height(10.dp))
+                GhostBtn("Đo lại", Modifier.fillMaxWidth()) { step = 3 }
             }
         }
     }

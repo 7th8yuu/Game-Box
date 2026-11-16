@@ -3,6 +3,9 @@
 P=com.gamebox.helper
 adb shell am start -S -W -n $P/.MainActivity >/dev/null
 sleep 8
+# Vuốt liên tục trong nền để app có khung hình thật (app đứng yên thì không sinh khung nên FPS = 0 là đúng)
+adb shell "input swipe 900 300 100 300 6000" &
+sleep 1
 echo "FPS_PROBE layers:"
 adb shell "dumpsys SurfaceFlinger --list | grep -F $P"
 CMD='dumpsys SurfaceFlinger --list | grep -F "'$P'" | grep -v -e "^Background for" -e "^Bounds for" | head -n 8 | while IFS= read -r L; do echo "@@$L"; dumpsys SurfaceFlinger --latency "$L"; done'
