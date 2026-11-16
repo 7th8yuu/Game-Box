@@ -56,6 +56,22 @@ fun HomePage(gs: Gs, goProfile: () -> Unit) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(14.dp))
+        // Độ phân giải đang bị hạ cho phiên chơi: cho khôi phục ngay nếu game đã thoát mà chưa tự trả lại
+        AnimatedVisibility(gs.wmOn) {
+            Panel(Modifier.fillMaxWidth().padding(bottom = 12.dp), pad = 14.dp, tint = Warn) {
+                Text("Đang hạ độ phân giải để chơi game", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("Sẽ tự trả lại khi game thoát. Nếu đã thoát game mà màn hình còn nhỏ, bấm khôi phục.", fontSize = 12.sp, color = Dim)
+                Spacer(Modifier.height(8.dp))
+                GhostBtn("Khôi phục ngay", Modifier.fillMaxWidth(), icon = Ic.Reset) {
+                    gs.wmOn = false
+                    kotlin.concurrent.thread {
+                        val p = Rt.pkg.ifEmpty { gs.sp.getString("sess", "") ?: "" }
+                        Wm.restore(gs.sp); Rt.restore(p); gs.sp.edit().remove("sess").apply()
+                        ctx.stopService(Intent(ctx, Overlay::class.java))
+                    }
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Trang chủ", Modifier.weight(1f), fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Column(horizontalAlignment = Alignment.End) {

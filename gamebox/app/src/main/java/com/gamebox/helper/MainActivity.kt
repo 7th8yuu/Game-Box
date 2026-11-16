@@ -241,7 +241,11 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     val score: Int get() =
         (100 - (ram * 0.35 + (st?.cpuP ?: 0) * 0.35 + ((bat?.t ?: 30f) - 30f).coerceAtLeast(0f) * 1.5)).toInt().coerceIn(0, 100)
 
+    // true khi app đang giữ độ phân giải màn hình ở mức đã hạ (phiên chơi chưa được khôi phục)
+    var wmOn by mutableStateOf(false)
+
     fun sample() {
+        wmOn = sp.getBoolean("wm_on", false)
         val x = Rt.stats(); st = x
         val (t, a) = Rt.mem(); total = t; used = t - a; ram = (100 - a * 100 / t).toInt()
         val b = readBat(ctx); bat = b
