@@ -75,6 +75,8 @@ class HubActivity : ComponentActivity() {
         val tab0 = if (dbg) intent.getIntExtra("tab", 1).coerceIn(0, 2) else 1
         val opt0 = if (dbg) intent.getIntExtra("opt", 0).coerceIn(0, 2) else 0
         val act0 = dbg && intent.getBooleanExtra("act", false)
+        // Chỉ bản debug: CI mở thẳng một bài kiểm tra cảm ứng để chụp
+        if (dbg && intent.hasExtra("lab")) g.labKind = intent.getIntExtra("lab", -1)
         setContent { HubApp(g, tab0, opt0, act0) }
     }
 }

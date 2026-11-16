@@ -75,7 +75,7 @@ fun TexScreen(gs: Gs) {
     val shown by animateFloatAsState(if (hold) 1f else pos, if (hold) tween<Float>(150) else snap<Float>(), label = "hold")
     BackHandler { gs.tex = false }
     val tag = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(.55f)).padding(horizontal = 10.dp, vertical = 4.dp)
-    Box(Modifier.fillMaxSize().background(Color(0xF2080E14)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF080E14)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
         Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight().enter(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

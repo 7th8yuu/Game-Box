@@ -5,15 +5,19 @@ adb shell wm size 192x384; adb shell wm density 96; sleep 2
 echo "WM_PROBE after apply:"; adb shell wm size; adb shell wm density
 adb shell wm size reset; adb shell wm density reset; sleep 2
 echo "WM_PROBE after reset:"; adb shell wm size; adb shell wm density
-echo "WM_PROBE game mode (số):"
-for pk in com.android.chrome com.google.android.apps.maps; do
-  echo "-- $pk"
-  adb shell cmd game set --mode 2 --downscale 0.60 --fps disable $pk
-  adb shell cmd game set --mode 2 --downscale 0.60 --fps 60 $pk
-  adb shell cmd game mode performance $pk
+echo "WM_PROBE game mode (thứ tự mới):"
+for pk in com.android.chrome; do
+  echo "-- $pk: set không --mode rồi mode custom"
+  adb shell cmd game set --downscale 0.60 --fps 60 $pk
+  adb shell cmd game list-modes $pk
+  adb shell cmd game mode custom $pk
+  adb shell cmd game list-modes $pk
   adb shell cmd game list-configs $pk
   adb shell cmd game reset $pk
   adb shell cmd game mode standard $pk
+  echo "-- chỉ downscale, không fps"
+  adb shell cmd game set --mode 2 --downscale 0.50 $pk
+  adb shell cmd game list-configs $pk
+  adb shell cmd game reset $pk
 done
-adb shell cmd game help | head -30
 echo "WM_PROBE done"

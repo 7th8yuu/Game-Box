@@ -109,17 +109,21 @@ object Rt {
         else sh("pkill -2 screenrecord")
     }
 
-    // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res % (chỉ dùng cho cách "Chỉ game"), fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc
+    // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res % (chỉ dùng cho cách "Chỉ game"), fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc.
+    // Kiểm thử trên Android 14: "--fps disable" bị từ chối (NumberFormatException) nên chỉ truyền tham số khi thật sự cần;
+    // "set --mode" đòi số; game phải ở chế độ đó mới có hiệu lực và game không hỗ trợ thì lệnh "mode" báo "not supported".
     fun applyGame(p: String, gm: Int, res: Int, fps: Int, hz: Int, sat: Float) {
-        val ds = if (res >= 95) "disable" else String.format(Locale.US, "%.2f", (res.coerceAtLeast(30) / 5 * 5) / 100.0)
-        val fp = if (fps in listOf(30, 45, 60, 90, 120)) fps.toString() else "disable"
-        // Cấu hình ghi đè (độ phân giải, FPS) chỉ có tác dụng ở chế độ Hiệu năng/Tiết kiệm, nên Chuẩn mà có yêu cầu thì dùng Hiệu năng
-        val m = if (gm == 0 && (ds != "disable" || fp != "disable")) 1 else gm
+        var args = ""
+        if (res < 95) args += String.format(Locale.US, " --downscale %.2f", (res.coerceIn(30, 90) / 5 * 5) / 100.0)
+        if (fps in listOf(30, 45, 60, 90, 120)) args += " --fps $fps"
+        // Cấu hình ghi đè (độ phân giải, FPS) chỉ dùng được ở chế độ khác Chuẩn, nên Chuẩn mà có yêu cầu thì dùng Hiệu năng
+        val m = if (gm == 0 && args.isNotEmpty()) 1 else gm
         if (m != 0) {
             val name = arrayOf("standard", "performance", "battery")[m]
-            // "set --mode" đòi số (1 chuẩn, 2 hiệu năng, 3 tiết kiệm) và chỉ ghi cấu hình; "mode" mới kích hoạt cho game.
-            // "set" phải chạy trước vì nó làm chế độ đó trở thành "được hỗ trợ" cho game.
-            sh("cmd game set --mode ${m + 1} --downscale $ds --fps $fp $p", "cmd game mode $name $p")
+            if (args.isNotEmpty()) sh("cmd game set --mode ${m + 1}$args $p")
+            val r = sh("cmd game mode $name $p")
+            // Game chưa khai báo chế độ này: thử chế độ tùy chỉnh (custom) của Android 14+
+            if (args.isNotEmpty() && r.any { it.contains("not supported", true) }) sh("cmd game set$args $p", "cmd game mode custom $p")
         }
         if (hz > 0) sh("settings put system peak_refresh_rate $hz", "settings put system min_refresh_rate $hz")
         if (sat != 1f) sh("service call SurfaceFlinger 1022 f $sat")
