@@ -6,10 +6,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
     <application android:name=".CrashApp" android:label="Game Box" android:theme="@android:style/Theme.Material.NoActionBar">
-        <!-- Ứng dụng chính, màn hình dọc -->
+        <!-- Ứng dụng chính, màn hình dọc. Phải xử lý "density": hạ độ phân giải bằng wm density đổi cấu hình, nếu để hệ thống
+             tạo lại Activity thì phiên chơi đang áp bị coi là dang dở và bị hoàn tác ngay -->
         <activity android:name=".HubActivity" android:exported="true"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|density|uiMode|fontScale|locale|layoutDirection|colorMode|navigation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -18,7 +19,7 @@
         <!-- Game Space, màn hình ngang, mở từ Trang chủ -->
         <activity android:name=".MainActivity" android:exported="true"
             android:screenOrientation="sensorLandscape"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"/>
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|density|uiMode|fontScale|locale|layoutDirection|colorMode|navigation"/>
         <service android:name=".Overlay" android:exported="false"/>
         <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="${applicationId}.shizuku"
             android:multiprocess="false" android:enabled="true" android:exported="true"

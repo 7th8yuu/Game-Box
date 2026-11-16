@@ -1,0 +1,78 @@
+package com.gamebox.helper
+
+import android.content.SharedPreferences
+
+// Chỉ bản debug: CI chạy các lớp này bằng app_process dưới quyền shell (cùng quyền với Shizuku) để thử đúng mã của app
+// trên emulator: CLASSPATH=<base.apk> app_process /system/bin com.gamebox.helper.FpsCli <gói> <số lần>
+private fun local(cmd: String): List<String> = try {
+    val p = ProcessBuilder("sh", "-c", cmd).start()
+    val r = p.inputStream.bufferedReader().readLines()
+    p.waitFor()
+    r
+} catch (e: Exception) { listOf("EXC $e") }
+
+object FpsCli {
+    @JvmStatic
+    fun main(a: Array<String>) {
+        val pkg = a.getOrNull(0) ?: "com.gamebox.helper"
+        val n = a.getOrNull(1)?.toIntOrNull() ?: 8
+        val m = FpsMeter { local("{\n$it\n} 2>/dev/null") }
+        for (i in 0 until n) {
+            val f = m.measure(pkg, System.nanoTime() / 1_000_000L)
+            println("FPSCLI $i fps=$f")
+            m.diag.lines().forEach { println("FPSCLI    $it") }
+            Thread.sleep(1000)
+        }
+    }
+}
+
+private class MemPrefs : SharedPreferences {
+    val m = HashMap<String, Any?>()
+    override fun getAll(): MutableMap<String, *> = m
+    override fun getString(k: String, d: String?) = m[k] as? String ?: d
+    override fun getStringSet(k: String, d: MutableSet<String>?) = d
+    override fun getInt(k: String, d: Int) = m[k] as? Int ?: d
+    override fun getLong(k: String, d: Long) = m[k] as? Long ?: d
+    override fun getFloat(k: String, d: Float) = m[k] as? Float ?: d
+    override fun getBoolean(k: String, d: Boolean) = m[k] as? Boolean ?: d
+    override fun contains(k: String) = m.containsKey(k)
+    override fun registerOnSharedPreferenceChangeListener(l: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+    override fun unregisterOnSharedPreferenceChangeListener(l: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+    override fun edit(): SharedPreferences.Editor = MemEditor(m)
+}
+
+private class MemEditor(val m: HashMap<String, Any?>) : SharedPreferences.Editor {
+    val pending = HashMap<String, Any?>()
+    val del = HashSet<String>()
+    override fun putString(k: String, v: String?): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun putStringSet(k: String, v: MutableSet<String>?): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun putInt(k: String, v: Int): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun putLong(k: String, v: Long): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun putFloat(k: String, v: Float): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun putBoolean(k: String, v: Boolean): SharedPreferences.Editor { pending[k] = v; return this }
+    override fun remove(k: String): SharedPreferences.Editor { del.add(k); return this }
+    override fun clear(): SharedPreferences.Editor { m.clear(); return this }
+    override fun commit(): Boolean { apply(); return true }
+    override fun apply() { del.forEach { m.remove(it) }; pending.forEach { (k, v) -> m[k] = v }; pending.clear(); del.clear() }
+}
+
+// Thử Wm.read/apply/restore bằng quyền shell thật: áp 60%, đọc lại, khôi phục
+object WmCli {
+    @JvmStatic
+    fun main(a: Array<String>) {
+        Rt.backend = "shizuku"
+        Rt.exec = { local(it) }
+        val sp = MemPrefs()
+        val pct = a.getOrNull(0)?.toIntOrNull() ?: 60
+        fun show(t: String) { val i = Wm.read(); println("WMCLI $t: " + (i?.let { "phys ${it.pw}x${it.ph}/${it.pd} override ${it.ow}x${it.oh}/${it.od}" } ?: "không đọc được")) }
+        show("trước")
+        println("WMCLI apply($pct) = ${Wm.apply(sp, pct)}")
+        show("sau áp")
+        Thread.sleep(1500)
+        Wm.restore(sp, "thử nghiệm")
+        Thread.sleep(500)
+        show("sau khôi phục")
+        println("WMCLI nhật ký:"); Wm.logText(sp).lines().forEach { println("WMCLI   $it") }
+        println("WMCLI cờ còn lại: wm_on=${sp.getBoolean("wm_on", false)}")
+    }
+}

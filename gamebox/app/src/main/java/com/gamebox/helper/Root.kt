@@ -12,6 +12,10 @@ object Rt {
     @Volatile var pkg = ""
     @Volatile var backend = "none" // root | shizuku | none
     @Volatile var since = 0L // thời điểm có quyền (elapsedRealtime), dùng cho "Phiên truy cập"
+    // Chỉ dùng cho kiểm thử dòng lệnh trong CI (debug/FpsCli.kt): chạy lệnh thẳng bằng quyền shell của app_process
+    @Volatile var exec: ((String) -> List<String>)? = null
+    val meter = FpsMeter { Rt.sh(it) }
+    @Volatile var fpsNow = -1 // FPS mới nhất do vòng lặp của dịch vụ overlay đo, -1 = không đo được
     private var lt = 0L
     private var li = 0L
 
@@ -41,20 +45,31 @@ object Rt {
         if (!Shizuku.pingBinder()) 0 else if (Shizuku.checkSelfPermission() == 0) 2 else 1
     }.getOrDefault(0)
 
-    fun sh(vararg c: String): List<String> = when (backend) {
-        "root" -> Shell.cmd(*c).exec().out
-        "shizuku" -> exec1("{\n" + c.joinToString("\n") + "\n} 2>/dev/null")
-        else -> emptyList()
+    fun sh(vararg c: String): List<String> {
+        exec?.let { return it("{\n" + c.joinToString("\n") + "\n} 2>/dev/null") }
+        return when (backend) {
+            "root" -> Shell.cmd(*c).exec().out
+            "shizuku" -> exec1("{\n" + c.joinToString("\n") + "\n} 2>/dev/null")
+            else -> emptyList()
+        }
     }
 
-    private fun exec1(cmd: String): List<String> = runCatching {
+    // Lỗi gần nhất khi chạy lệnh qua Shizuku (hiện trong hộp Chẩn đoán), rỗng nếu lần gần nhất chạy được
+    @Volatile var lastErr = ""
+
+    private fun exec1(cmd: String): List<String> = try {
         val m = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
         m.isAccessible = true
         val p = m.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
         val r = p.inputStream.bufferedReader().readLines()
         p.waitFor()
+        lastErr = ""
         r
-    }.getOrDefault(emptyList())
+    } catch (e: Throwable) {
+        val c = e.cause ?: e
+        lastErr = "${c.javaClass.simpleName}: ${c.message}"
+        emptyList()
+    }
 
     // Cấp quyền vẽ đè, thông báo và đọc thời gian sử dụng (để hiện giờ đã chơi) bằng root/Shizuku
     fun grant(p: String) { sh("appops set $p SYSTEM_ALERT_WINDOW allow", "appops set $p GET_USAGE_STATS allow", "pm grant $p android.permission.POST_NOTIFICATIONS") }
@@ -132,6 +147,8 @@ object Rt {
     fun restore(p: String) {
         sh("cmd game reset $p", "cmd game mode standard $p", "settings delete system peak_refresh_rate", "settings delete system min_refresh_rate", "service call SurfaceFlinger 1022 f 1.0")
         anim(0); msaa(false); driver(0); pointer(0); record(false)
+        sh("dumpsys SurfaceFlinger --timestats -disable >/dev/null 2>&1")
+        meter.reset(); fpsNow = -1
     }
 
     fun clean(): String {
@@ -176,54 +193,15 @@ object Rt {
         }
         return St(
             ((v("c").toLongOrNull() ?: 0L) / 1000).toInt(), v("g"),
-            ((v("f").toLongOrNull() ?: 0L) / 1000000).toInt(), v("h"), fps(), cp.coerceIn(0, 100), (v("b").toIntOrNull() ?: 0).coerceIn(0, 100)
+            ((v("f").toLongOrNull() ?: 0L) / 1000000).toInt(), v("h"), fpsNow, cp.coerceIn(0, 100), (v("b").toIntOrNull() ?: 0).coerceIn(0, 100)
         )
     }
 
-    // FPS từ SurfaceFlinger --latency. Một game có vài layer (cửa sổ, SurfaceView, "Background for ..."),
-    // nên đo mọi layer thuộc gói rồi lấy layer có nhịp khung hình cao nhất; bỏ layer nền/viền không có khung.
-    private val lastTs = HashMap<String, Pair<Long, Long>>() // layer -> (mốc khung cuối, lúc mốc đó đổi lần cuối)
-
-    fun fps(): Int {
-        val p = pkg
-        if (p.isBlank()) return 0
-        val o = sh(
-            "dumpsys SurfaceFlinger --list | grep -F \"$p\" | grep -v -e '^Background for' -e '^Bounds for' | head -n 8 | " +
-                "while IFS= read -r L; do echo \"@@\$L\"; dumpsys SurfaceFlinger --latency \"\$L\"; done"
-        )
-        return parseFps(o)
-    }
-
-    // Đầu vào: các khối "@@<tên layer>", dòng đầu là chu kỳ làm mới, các dòng sau gồm 3 mốc thời gian (ns); cột 2 = lúc hiển thị thật.
-    // Layer không có khung mới suốt hơn 2 giây (game tạm dừng) tính là 0. Có thể gọi từ nhiều luồng nên đồng bộ.
-    @Synchronized
-    fun parseFps(o: List<String>): Int {
-        val now = android.os.SystemClock.elapsedRealtime()
-        var best = 0
-        var name = ""
-        var ts = ArrayList<Long>()
-        fun flush() {
-            if (name.isEmpty() || ts.size < 2) { ts = ArrayList(); return }
-            val last = ts.max()
-            val prev = lastTs[name]
-            if (prev == null || prev.first != last) lastTs[name] = last to now
-            else if (now - prev.second > 2000L) { ts = ArrayList(); return }
-            val win = ts.filter { it > last - 1_000_000_000L }.sorted()
-            val span = win.last() - win.first()
-            val f = if (win.size >= 3 && span > 200_000_000L) ((win.size - 1) * 1e9 / span).toInt() else win.size
-            if (f > best) best = f
-            ts = ArrayList()
-        }
-        for (raw in o) {
-            val l = raw.trim()
-            if (l.startsWith("@@")) { flush(); name = l.substring(2); continue }
-            val c = l.split(Regex("\\s+"))
-            if (c.size >= 3) {
-                val t = c[1].toLongOrNull() ?: continue
-                if (t > 0L && t < Long.MAX_VALUE / 2) ts.add(t)
-            }
-        }
-        flush()
-        return best.coerceIn(0, 240)
+    // Đo FPS của game (chỉ vòng lặp của dịch vụ overlay gọi, mỗi giây một lần). Mọi nơi khác đọc Rt.fpsNow
+    // để không có hai nơi cùng gọi dumpsys liên tục làm nặng máy đang chơi game.
+    fun measureFps(): Int {
+        val v = meter.measure(pkg, android.os.SystemClock.elapsedRealtime())
+        fpsNow = v
+        return v
     }
 }

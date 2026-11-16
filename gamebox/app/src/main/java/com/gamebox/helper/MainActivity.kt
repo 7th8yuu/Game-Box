@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        android.util.Log.i("GB_CREATE", "GameSpace")
         if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
         // Chỉ bản debug: cho smoke test CI bật overlay trực tiếp (Overlay không được export)
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent.getBooleanExtra("smoke_overlay", false)) {
@@ -175,13 +176,20 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     init {
         GlassOn = sp.getBoolean("glass", defaultGlass())
-        // Phiên trước còn dang dở (app bị tắt giữa chừng): trả lại cài đặt để game mở ngoài app chạy bình thường
-        val pend = sp.getString("sess", "") ?: ""
-        if ((pend.isNotEmpty() || sp.getBoolean("wm_on", false)) && !Overlay.alive) {
-            sp.edit().remove("sess").apply()
-            thread { Rt.init(); Rt.restore(pend); Wm.restore(sp); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+        // Phiên trước còn dang dở (tiến trình app bị tắt giữa chừng): trả lại cài đặt để game mở ngoài app chạy bình thường.
+        // Chỉ kiểm tra một lần cho mỗi tiến trình. Gs được tạo lại mỗi khi Activity được tạo lại; nếu kiểm tra ở mỗi lần thì
+        // phiên vừa áp (ví dụ vừa hạ độ phân giải, Activity bị tạo lại) sẽ bị coi là dang dở và hoàn tác ngay.
+        if (!checked) {
+            checked = true
+            val pend = sp.getString("sess", "") ?: ""
+            if ((pend.isNotEmpty() || sp.getBoolean("wm_on", false)) && !Overlay.alive) {
+                sp.edit().remove("sess").apply()
+                thread { Rt.init(); Rt.restore(pend); Wm.restore(sp, "app mở lại, còn phiên dang dở"); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+            }
         }
     }
+
+    companion object { @Volatile private var checked = false }
 
     fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
@@ -243,14 +251,16 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     // true khi app đang giữ độ phân giải màn hình ở mức đã hạ (phiên chơi chưa được khôi phục)
     var wmOn by mutableStateOf(false)
+    var wmT by mutableStateOf("") // kích thước đang áp, ví dụ 432×960
 
     fun sample() {
         wmOn = sp.getBoolean("wm_on", false)
+        wmT = sp.getString("wm_t", "") ?: ""
         val x = Rt.stats(); st = x
         val (t, a) = Rt.mem(); total = t; used = t - a; ram = (100 - a * 100 / t).toInt()
         val b = readBat(ctx); bat = b
         clock = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        listOf(x.cpuP, x.gpuP, ram, x.fps).forEachIndexed { i, v -> hist[i].add(v); if (hist[i].size > 60) hist[i].removeAt(0) }
+        listOf(x.cpuP, x.gpuP, ram, x.fps.coerceAtLeast(0)).forEachIndexed { i, v -> hist[i].add(v); if (hist[i].size > 60) hist[i].removeAt(0) }
         temps.add(b.t); if (temps.size > 600) temps.removeAt(0)
         runCatching {
             val sf = android.os.StatFs(android.os.Environment.getDataDirectory().path)
@@ -302,6 +312,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     // dịch vụ, nút Thoát hoặc lần mở app sau trả lại như cũ, nên game mở ngoài app vẫn chạy bình thường.
     private fun start(p: String, withOverlay: Boolean) {
         Rt.pkg = p
+        Rt.meter.reset(); Rt.fpsNow = -1
         sp.edit().putString("sess", p).apply()
         val gm = g("gm", 0); val res = g("res", 100); val fps = listOf(30, 45, 60, 90, 120, 0)[g("fps", 5)]
         val hzv = g("hz", 0).let { if (it < 30) 0 else it }; val sat = g("sat", 100) / 100f
@@ -326,7 +337,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         val p = Rt.pkg.ifEmpty { sel }; Rt.pkg = ""
         sp.edit().remove("sess").apply()
         ctx.stopService(Intent(ctx, Overlay::class.java))
-        thread { Rt.restore(p); Wm.restore(sp); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
+        thread { Rt.restore(p); Wm.restore(sp, "nút Thoát trong app"); Rt.mode(0); Rt.fixed(false); Rt.dnd(false) }
     }
 }
 
@@ -338,8 +349,10 @@ fun GsEffects(gs: Gs) {
         withContext(Dispatchers.IO) { Rt.init(); Rt.grant(ctx.packageName); gs.refreshAccess() }
         withContext(Dispatchers.IO) { gs.loadPlaytime() }
     }
-    LaunchedEffect(Unit) { while (true) { withContext(Dispatchers.IO) { gs.sample() }; delay(1000) } }
-    LaunchedEffect(Unit) { while (true) { gs.ping = withContext(Dispatchers.IO) { Rt.ping() }; delay(10000) } }
+    // Chỉ đo khi màn hình app đang hiện: khi đang chơi game app nằm nền, mỗi lần đo là vài tiến trình shell làm nặng máy
+    val life = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(Unit) { while (true) { if (life.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) withContext(Dispatchers.IO) { gs.sample() }; delay(1000) } }
+    LaunchedEffect(Unit) { while (true) { if (life.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) gs.ping = withContext(Dispatchers.IO) { Rt.ping() }; delay(10000) } }
 }
 
 private val Titles = listOf("Chọn game", "Hiệu năng", "Pin", "Đồ họa")

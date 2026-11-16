@@ -584,11 +584,11 @@ class Overlay : Service() {
     }
 
     // Kết thúc phiên chơi: trả lại cài đặt hệ thống/game rồi dừng dịch vụ
-    private fun endSession() {
+    private fun endSession(why: String = "nút Thoát") {
         val p = Rt.pkg.ifEmpty { sp.getString("sess", "") ?: "" }
         Rt.pkg = ""
         sp.edit().remove("sess").apply()
-        thread { Rt.restore(p); Wm.restore(sp); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
+        thread { Rt.restore(p); Wm.restore(sp, "kết thúc phiên ($why)"); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
         stopSelf()
     }
 
@@ -599,18 +599,18 @@ class Overlay : Service() {
             val fmt = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
             var tick = 0; var seen = false; var miss = 0
             while (run) {
-                val s = Rt.stats(); val (t, a) = Rt.mem()
+                Rt.measureFps(); val s = Rt.stats(); val (t, a) = Rt.mem()
                 val b = readBat(this)
                 st.fps = s.fps; st.cpuP = s.cpuP; st.gpuP = s.gpuP; st.cpu = s.cpu; st.gpu = s.gpu; st.cg = s.cg; st.gg = s.gg
                 st.ram = 100 - (a * 100 / t).toInt(); st.temp = b.t; st.bat = b.lv; st.clock = fmt.format(java.util.Date())
-                st.hist.add(s.fps); if (st.hist.size > 60) st.hist.removeAt(0)
+                st.hist.add(s.fps.coerceAtLeast(0)); if (st.hist.size > 60) st.hist.removeAt(0)
                 // Theo dõi game: khi tiến trình game thoát (đã từng thấy) thì tự khôi phục để lần mở game ngoài app là bình thường.
                 // Chỉ kết luận khi đã từng thấy tiến trình, tránh tự dừng nhầm nếu máy không cho đọc pidof.
                 val p = Rt.pkg
                 if (tick % 2 == 0 && p.isNotEmpty() && Rt.backend != "none") {
                     val alive = Rt.sh("pidof $p").any { it.trim().isNotEmpty() }
                     if (alive) { seen = true; miss = 0 } else if (seen && ++miss >= 3) {
-                        main.post { endSession() }
+                        main.post { endSession("game đã đóng") }
                         break
                     }
                 }

@@ -64,6 +64,7 @@ import kotlin.concurrent.thread
 class HubActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        android.util.Log.i("GB_CREATE", "Hub")
         if (Crash.pending(this)) { setContentView(Crash.view(this) { recreate() }); return }
         enableEdgeToEdge(SystemBarStyle.dark(AColor.TRANSPARENT), SystemBarStyle.dark(AColor.TRANSPARENT))
         cap60(this)
@@ -376,6 +377,10 @@ fun HubSettings(gs: Gs, close: () -> Unit) {
             SwRow("Nền động", "Đốm sáng trôi chậm phía sau", gs.live) { gs.putLive(it) }
             SwRow("Bảng điều khiển trong game", "Hiện nút nổi khi chơi từ Game Box", gs.ov) { gs.putOv(it) }
             Spacer(Modifier.height(6.dp))
+            var diag by remember { mutableStateOf(false) }
+            GhostBtn("Chẩn đoán lỗi", Modifier.fillMaxWidth(), icon = Ic.Tune) { diag = true }
+            if (diag) DiagDialog(gs) { diag = false }
+            Spacer(Modifier.height(8.dp))
             GhostBtn("Khôi phục độ phân giải màn hình", Modifier.fillMaxWidth(), icon = Ic.Reset) {
                 kotlin.concurrent.thread { Wm.forceReset(gs.sp) }
                 android.widget.Toast.makeText(gs.ctx, "Đã trả độ phân giải về mặc định của máy.", android.widget.Toast.LENGTH_SHORT).show()
