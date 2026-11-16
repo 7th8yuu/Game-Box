@@ -14,8 +14,13 @@ jobs:
         with: { gradle-version: "8.9" }
       - run: gradle -p gamebox assembleDebug --no-daemon
       # In chữ ký của APK: phải luôn giống nhau giữa các lần build thì mới cài đè được
+      # APK chỉ ký v2/v3 (minSdk 29) nên phải dùng apksigner; bước này chỉ để in dấu vân tay, lỗi không làm hỏng bản build
       - name: Chữ ký APK
-        run: keytool -printcert -jarfile gamebox/app/build/outputs/apk/debug/app-debug.apk | grep -E "Owner|SHA256"
+        continue-on-error: true
+        run: |
+          AS=$(find /usr/local/lib/android/sdk/build-tools -name apksigner 2>/dev/null | sort -V | tail -1)
+          echo "apksigner: $AS"
+          "$AS" verify --print-certs gamebox/app/build/outputs/apk/debug/app-debug.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
       - uses: actions/upload-artifact@v4
         with:
           name: GameBox-debug
