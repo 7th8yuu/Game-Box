@@ -127,7 +127,7 @@ object GfxCli {
         // Cách game render: đo API thật của game và câu mô tả cho màn Kết cấu
         val sp = MemPrefs()
         Render.measure(sp, pkg, 2) { println("GFXCLI nói: $it") }
-        println("GFXCLI render: ${Render.seenText(sp, pkg)} · nhật ký: ${Wm.logText(sp).replace('\n', ' ¦ ')}")
+        println("GFXCLI render: ${Render.seenText(sp, pkg)} · nhật ký: ${Wm.logText(sp).replace("\n", " ¦ ")}")
         println("GFXCLI tham số unity: gles=${Render.arg(1)} vulkan=${Render.arg(2)} tự động=[${Render.arg(0)}]")
     }
 }
