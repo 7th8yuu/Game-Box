@@ -95,7 +95,7 @@ object GfxLab {
         when {
             angleLoaded -> add("OK", "ANGLE", "Game đang nạp thư viện ANGLE, kết cấu thật qua ANGLE dùng được.")
             ap.ok -> add("OK", "ANGLE", "Máy có gói ANGLE hệ thống (${ap.pkg}), kết cấu thật qua ANGLE dùng được. Cần đóng hẳn rồi mở lại game từ Game Box.")
-            else -> add("KHÓA", "ANGLE", "${ap.why().replaceFirstChar { it.uppercase() }}. Gói ANGLE tự cài cũng không nạp được vì dùng chung điều kiện debug ở trên.")
+            else -> add("KHÓA", "ANGLE", ap.why().replaceFirstChar { it.uppercase() } + if (canLoad) "." else ". Gói ANGLE tự cài cũng không nạp được vì dùng chung điều kiện debug ở trên.")
         }
 
         progress("Xem Game Mode...")
@@ -115,7 +115,7 @@ object GfxLab {
         if (angleLoaded || ap.ok) ok.add("kết cấu qua ANGLE")
         add("i", "KẾT LUẬN", if (ok.isEmpty())
             "Chưa cách nào dùng được trên máy này${if (screenTest) "" else " (chưa thử độ phân giải)"}."
-        else "Dùng được: ${ok.joinToString(", ")}." + if (!(angleLoaded || ap.ok)) " Kết cấu thật (OpenGL ES, Vulkan, ANGLE) bị Android khóa; cách còn lại giảm tải đáng kể là độ phân giải, vì mip kết cấu được chọn theo số điểm ảnh trên màn nên hạ độ phân giải cũng làm game lấy mẫu kết cấu nhỏ hơn." else "")
+        else "Dùng được: ${ok.joinToString(", ")}." + if (!(angleLoaded || ap.ok)) (if (canLoad) " Kết cấu thật cần một thư viện layer riêng (Game Box chưa có)." else " Kết cấu thật (OpenGL ES, Vulkan, ANGLE) bị Android khóa.") + " Cách còn lại giảm tải đáng kể là độ phân giải, vì mip kết cấu được chọn theo số điểm ảnh trên màn nên hạ độ phân giải cũng làm game lấy mẫu kết cấu nhỏ hơn." else "")
         add("i", "Đường vòng có root (Game Box KHÔNG làm)", "Bật ro.debuggable=1 rồi khởi động lại hệ thống sẽ mở khóa layer, nhưng nhiều game phát hiện máy ở chế độ debug (rủi ro bị khóa tài khoản), có thể treo máy khi khởi động, và bạn bè không root không dùng được. Nếu muốn thử thì tự chịu rủi ro.")
         return rows
     }
