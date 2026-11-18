@@ -54,6 +54,9 @@ object Diag {
         val i = if (Rt.backend == "none") null else Wm.read()
         line("hiện tại: " + (i?.let { "vật lý ${it.pw}x${it.ph}/${it.pd}, kích thước ${if (it.ow > 0) "đang ghi đè ${it.ow}x${it.oh}" else "mặc định"}, mật độ ${if (it.od > 0) "đang ghi đè ${it.od}" else "mặc định"}" } ?: "không đọc được"))
         line("cài đặt đã lưu cho ${gs.sel.ifEmpty { "(chưa chọn game)" }}: mức=${gs.g("res", 100)}% · cách=${if (gs.g("texm", 0) == 0) "cả màn hình" else "Game Mode"} · fps=${gs.g("fps", 5)} · chế độ=${gs.g("gm", 0)}")
+        // Mức giảm đã lưu của MỌI game: nếu bấm Chơi ở một game khác với game đã lưu mức giảm thì sẽ không có gì được hạ
+        val saved = gs.sp.all.keys.filter { it.startsWith("res_") }.sortedBy { it }.joinToString("; ") { "${it.removePrefix("res_")}=${gs.sp.getInt(it, 100)}% (cách ${if (gs.sp.getInt("texm_" + it.removePrefix("res_"), 0) == 0) "cả màn hình" else "Game Mode"})" }
+        line("mức giảm đã lưu của từng game: ${saved.ifEmpty { "(chưa game nào)" }}")
         line("app đang giữ hạ=${gs.sp.getBoolean("wm_on", false)} · gốc=${gs.sp.getString("wm_o", "")} · mục tiêu=${gs.sp.getString("wm_t", "")}")
         line("nhật ký (cũ -> mới):")
         val log = Wm.logText(gs.sp)
@@ -74,6 +77,8 @@ object Diag {
 fun DiagDialog(gs: Gs, close: () -> Unit) {
     var text by remember { mutableStateOf("Đang thu thập...") }
     var tick by remember { mutableIntStateOf(0) }
+    var testing by remember { mutableStateOf(false) }
+    var testOut by remember { mutableStateOf("") }
     LaunchedEffect(tick) { text = withContext(Dispatchers.IO) { runCatching { Diag.report(gs) }.getOrElse { "Lỗi khi thu thập: $it" } } }
     Dialog(close, DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxWidth(.94f).fillMaxHeight(.86f).clip(RoundedCornerShape(26.dp)).background(Color(0xFF0E1822)).border(1.dp, Color.White.copy(.12f), RoundedCornerShape(26.dp)).padding(18.dp)) {
@@ -81,9 +86,19 @@ fun DiagDialog(gs: Gs, close: () -> Unit) {
             Text("Nếu một tính năng không chạy, bấm Sao chép rồi gửi nội dung này.", fontSize = 12.sp, color = Dim)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(.35f)).padding(10.dp)) {
-                Text(text, Modifier.verticalScroll(rememberScrollState()), fontSize = 11.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace)
+                Text((if (testOut.isEmpty()) "" else "== Thử hạ 5 giây ==\n$testOut\n") + text, Modifier.verticalScroll(rememberScrollState()), fontSize = 11.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace)
             }
             Spacer(Modifier.height(10.dp))
+            GhostBtn(if (testing) "Đang thử... màn hình sẽ thu nhỏ rồi tự trả lại" else "Thử hạ độ phân giải 5 giây", Modifier.fillMaxWidth()) {
+                if (!testing) {
+                    testing = true; testOut = "Đang thử..."
+                    kotlin.concurrent.thread {
+                        val r = runCatching { Wm.selfTest(gs.sp) }.getOrElse { "Lỗi khi thử: $it" }
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { testOut = r; testing = false; tick++ }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostBtn("Làm mới", Modifier.weight(1f)) { tick++ }
                 GhostBtn("Sao chép", Modifier.weight(1.2f)) {

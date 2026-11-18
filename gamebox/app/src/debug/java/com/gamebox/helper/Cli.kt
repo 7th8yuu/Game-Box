@@ -87,5 +87,9 @@ object WmCli {
         show("sau khôi phục")
         println("WMCLI nhật ký:"); Wm.logText(sp).lines().forEach { println("WMCLI   $it") }
         println("WMCLI cờ còn lại: wm_on=${sp.getBoolean("wm_on", false)}")
+        // Nút "Thử hạ 5 giây" của hộp Chẩn đoán
+        Wm.selfTest(sp).lines().filter { it.isNotEmpty() }.forEach { println("WMCLI selftest: $it") }
+        show("sau selftest")
+        println("WMCLI cờ sau selftest: wm_on=${sp.getBoolean("wm_on", false)}")
     }
 }
