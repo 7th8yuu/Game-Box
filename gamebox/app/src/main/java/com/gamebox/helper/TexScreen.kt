@@ -76,6 +76,7 @@ fun TexScreen(gs: Gs) {
     var hold by remember { mutableStateOf(false) }
     val shown by animateFloatAsState(if (hold) 1f else pos, if (hold) tween<Float>(150) else snap<Float>(), label = "hold")
     BackHandler { gs.tex = false }
+    if (gs.gfxOpen) GfxLabDialog(gs) { gs.gfxOpen = false }
     val tag = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(.55f)).padding(horizontal = 10.dp, vertical = 4.dp)
     Box(Modifier.fillMaxSize().background(Color(0xFF080E14)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
         Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -144,6 +145,7 @@ fun TexScreen(gs: Gs) {
                         else -> {
                             Text("Máy này chưa dùng được kết cấu thật: ${p.why()}.", fontSize = 12.sp, color = Warn)
                             Text("Ảnh Trước/Sau chỉ là mô phỏng. Muốn nhẹ máy ngay thì dùng độ phân giải ở dưới, phần đó chạy được trên mọi máy có Shizuku hoặc root.", fontSize = 12.sp, color = Color.White.copy(.65f))
+                            Spacer(Modifier.height(6.dp)); SmallBtn("Thử từng cách (OpenGL ES, Vulkan...)") { gs.gfxOpen = true }
                             if (p.bad) { Spacer(Modifier.height(6.dp)); SmallBtn("Cho phép thử lại") { Angle.clearBad(gs.sp); prTick++ } }
                         }
                     }

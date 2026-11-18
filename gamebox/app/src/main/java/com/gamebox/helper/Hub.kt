@@ -79,6 +79,7 @@ class HubActivity : ComponentActivity() {
         // Chỉ bản debug: CI mở thẳng một bài kiểm tra cảm ứng để chụp
         if (dbg && intent.hasExtra("lab")) g.labKind = intent.getIntExtra("lab", -1)
         if (dbg && intent.getBooleanExtra("diag", false)) g.diagOpen = true
+        if (dbg && intent.getBooleanExtra("gfx", false)) g.gfxOpen = true
         // Chỉ bản debug: CI mô phỏng người dùng chọn game, đặt mức giảm độ phân giải rồi bấm Chơi
         intent.getStringExtra("play")?.takeIf { dbg }?.let { pkg ->
             g.select(pkg); g.s("res", intent.getIntExtra("res", 60)); g.s("texm", 0); g.s("texl", intent.getIntExtra("texl", 0)); g.s("texd", intent.getIntExtra("texd", 0)); g.s("texb", intent.getIntExtra("texb", 0))
@@ -217,6 +218,7 @@ fun HubApp(gs: Gs, initTab: Int = 1, initOpt: Int = 0, initAct: Boolean = false)
                 if (settings) HubSettings(gs) { settings = false }
                 LabScreen(gs)
                 if (gs.diagOpen) DiagDialog(gs) { gs.diagOpen = false }
+                if (gs.gfxOpen) GfxLabDialog(gs) { gs.gfxOpen = false }
             }
         }
     }
@@ -385,6 +387,8 @@ fun HubSettings(gs: Gs, close: () -> Unit) {
             SwRow("Bảng điều khiển trong game", "Hiện nút nổi khi chơi từ Game Box", gs.ov) { gs.putOv(it) }
             Spacer(Modifier.height(6.dp))
             GhostBtn("Chẩn đoán lỗi", Modifier.fillMaxWidth(), icon = Ic.Tune) { gs.diagOpen = true }
+            Spacer(Modifier.height(8.dp))
+            GhostBtn("Phòng thử đồ họa (OpenGL ES, Vulkan, ANGLE...)", Modifier.fillMaxWidth(), icon = Ic.Tune) { gs.gfxOpen = true }
             Spacer(Modifier.height(8.dp))
             GhostBtn("Khôi phục độ phân giải màn hình", Modifier.fillMaxWidth(), icon = Ic.Reset) {
                 kotlin.concurrent.thread { Wm.forceReset(gs.sp) }

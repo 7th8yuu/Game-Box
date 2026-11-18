@@ -111,6 +111,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     var labKind by mutableIntStateOf(-1) // bài kiểm tra cảm ứng đang mở toàn màn hình (-1 = không)
     var menu by mutableStateOf(false)
     var diagOpen by mutableStateOf(false) // hộp Chẩn đoán đang mở
+    var gfxOpen by mutableStateOf(false)  // Phòng thử đồ họa đang mở
 
     // Mọi ứng dụng mở được, và danh sách game tự nhận diện (dùng khi người dùng chưa tự chọn thư viện)
     val allApps: List<ApplicationInfo> = pm.getInstalledApplications(0)

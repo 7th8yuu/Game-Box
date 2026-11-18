@@ -114,3 +114,15 @@ object AngleCli {
         println("ANGLECLI nhật ký:"); Wm.logText(sp).lines().forEach { println("ANGLECLI   $it") }
     }
 }
+
+// Chạy Phòng thử đồ họa (GfxLab) bằng quyền shell thật trên emulator: kiểm tra không lỗi và in kết quả từng dòng
+object GfxCli {
+    @JvmStatic
+    fun main(a: Array<String>) {
+        Rt.backend = "shizuku"
+        Rt.exec = { local(it) }
+        val pkg = a.getOrNull(0) ?: "com.gamebox.helper"
+        val rows = GfxLab.run(MemPrefs(), pkg, true) { }
+        rows.forEach { println("GFXCLI [${it.tag}] ${it.name}: ${it.detail.replace('\n', ' ').take(400)}") }
+    }
+}

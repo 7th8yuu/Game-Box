@@ -18,6 +18,9 @@ cli WmCli 60 | sed 's/^/  /'
 echo "ANGLECLI_PROBE:"
 cli AngleCli | sed 's/^/  /'
 
+echo "GFXCLI_PROBE:"
+cli GfxCli com.gamebox.helper | sed 's/^/  /'
+
 echo "SIM_PROBE: game giả GLSurfaceView"
 adb shell am start -S -W -n $P/.SimActivity >/dev/null; sleep 5
 echo "SIM layers:"; adb shell "dumpsys SurfaceFlinger --list | grep -F $P"
