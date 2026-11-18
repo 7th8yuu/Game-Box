@@ -321,25 +321,21 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         val gm = g("gm", 0); val res = g("res", 100); val fps = listOf(30, 45, 60, 90, 120, 0)[g("fps", 5)]
         val hzv = g("hz", 0).let { if (it < 30) 0 else it }; val sat = g("sat", 100) / 100f
         val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
-        val screenWide = g("texm", 0) == 0
         thread {
             // Nhật ký quyết định (hiện trong Chẩn đoán) để biết vì sao có hoặc không hạ độ phân giải
-            Wm.log(sp, "Chơi $p: mức $res% · cách ${if (screenWide) "cả màn hình" else "Game Mode"}${if (res >= 95) " · không giảm" else ""}")
+            Wm.log(sp, "Chơi $p: mức $res%${if (res >= 95) " · không giảm" else ""}")
             fun toast(msg: String) { if (msg.isNotEmpty()) Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() } }
-            // Cách "Cả màn hình": hạ wm size trước khi mở game để game khởi động đã ở độ phân giải mới.
-            // Nếu không đổi được thì rơi về Game Mode.
+            // Hạ cả màn hình (wm size) trước khi mở game để game khởi động đã ở độ phân giải mới.
+            // Trước đây có thêm lựa chọn "Chỉ game" qua Game Mode: máy thật báo nhận lệnh nhưng Free Fire không hề nhỏ đi
+            // (không có cách kiểm chứng), nên bỏ; wm size là cách duy nhất đã kiểm chứng được bằng cách đọc lại.
+            // Nếu wm không đổi được thì vẫn thử Game Mode như phương án cuối.
             var gmRes = res
-            if (res < 95 && screenWide) {
+            if (res < 95) {
                 if (Wm.apply(sp, res)) { gmRes = 100; Thread.sleep(700) }
                 // Báo ngay kết quả (hiện được cả khi game đã mở) để biết độ phân giải có thật sự bị hạ không
                 toast(Wm.lastMsg)
             }
-            val gmOk = Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
-            // Chọn "Chỉ game" mà game không nhận Game Mode thì hạ cả màn hình để vẫn có tác dụng
-            if (res < 95 && !screenWide && !gmOk) {
-                Wm.log(sp, "Game không nhận Game Mode, chuyển sang hạ cả màn hình")
-                if (Wm.apply(sp, res)) { Thread.sleep(700); toast("Game không nhận Game Mode nên đã hạ độ phân giải cả màn hình") } else toast(Wm.lastMsg)
-            }
+            Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
             if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {
                 // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và khôi phục khi game thoát; ui=false thì không vẽ nút nổi

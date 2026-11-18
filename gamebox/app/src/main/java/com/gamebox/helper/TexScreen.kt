@@ -44,7 +44,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 // Màn hình Kết cấu: so sánh trước/sau trên cảnh mẫu, chọn mức giảm độ phân giải render.
-// Phần áp dụng thật lên game là độ phân giải render (cmd game set --downscale). Mờ theo độ xa và viền kết cấu chỉ là xem trước.
+// Phần áp dụng thật là hạ độ phân giải màn hình trong phiên chơi (wm size, xem Wm.kt). Mờ theo độ xa và viền kết cấu chỉ là xem trước.
 @Composable
 fun TexScreen(gs: Gs) {
     val icon = gs.icon(gs.sel)
@@ -56,7 +56,6 @@ fun TexScreen(gs: Gs) {
     val res = gs.g("res", 100)
     var lvl by remember { mutableIntStateOf(levels.indices.minByOrNull { abs(levels[it] - res) } ?: 0) }
     var on by remember { mutableStateOf(true) }
-    var meth by remember { mutableIntStateOf(gs.g("texm", 0)) } // 0 cả màn hình (wm size), 1 chỉ game (Game Mode)
     var dist by remember { mutableIntStateOf(gs.g("texd", 0)) }
     var edge by remember { mutableStateOf(gs.g("texb", 0) == 1) }
     var info by remember { mutableStateOf<Triple<String, Int, Gpu.Game>?>(null) }
@@ -139,10 +138,8 @@ fun TexScreen(gs: Gs) {
                 val pw = big * levels[lvl] / 100; val ph = small * levels[lvl] / 100
                 Text("Game sẽ chạy ở khoảng $pw×$ph thay vì $big×$small (${levels[lvl]}%)", fontSize = 13.sp, color = Cy, fontWeight = FontWeight.Medium)
                 Lbl("CÁCH ÁP DỤNG")
-                Seg(listOf("Cả màn hình", "Chỉ game (thử)"), meth, Modifier.fillMaxWidth()) { meth = it }
                 Text(
-                    if (meth == 0) "Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải."
-                    else "Thử dùng Game Mode của Android để chỉ riêng game bị hạ. Nhiều game và máy không nhận; khi đó app tự chuyển sang hạ cả màn hình.",
+                    "Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn; kích thước chữ và nút trong game không đổi. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải.",
                     fontSize = 12.sp, color = Color.White.copy(.65f)
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -163,7 +160,7 @@ fun TexScreen(gs: Gs) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     GhostBtn("Đặt lại gốc", icon = Ic.Reset) { lvl = 0; dist = 0; edge = false }
                     PrimaryBtn("Lưu", Modifier.weight(1f), icon = Ic.Save) {
-                        gs.s("res", if (on) levels[lvl] else 100); gs.s("texm", meth); gs.s("texd", dist); gs.s("texb", if (edge) 1 else 0); gs.tex = false
+                        gs.s("res", if (on) levels[lvl] else 100); gs.s("texm", 0); gs.s("texd", dist); gs.s("texb", if (edge) 1 else 0); gs.tex = false
                     }
                 }
             }

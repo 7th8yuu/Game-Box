@@ -53,9 +53,9 @@ object Diag {
         line("== Độ phân giải ==")
         val i = if (Rt.backend == "none") null else Wm.read()
         line("hiện tại: " + (i?.let { "vật lý ${it.pw}x${it.ph}/${it.pd}, kích thước ${if (it.ow > 0) "đang ghi đè ${it.ow}x${it.oh}" else "mặc định"}, mật độ ${if (it.od > 0) "đang ghi đè ${it.od}" else "mặc định"}" } ?: "không đọc được"))
-        line("cài đặt đã lưu cho ${gs.sel.ifEmpty { "(chưa chọn game)" }}: mức=${gs.g("res", 100)}% · cách=${if (gs.g("texm", 0) == 0) "cả màn hình" else "Game Mode"} · fps=${gs.g("fps", 5)} · chế độ=${gs.g("gm", 0)}")
+        line("cài đặt đã lưu cho ${gs.sel.ifEmpty { "(chưa chọn game)" }}: mức=${gs.g("res", 100)}% · fps=${gs.g("fps", 5)} · chế độ=${gs.g("gm", 0)}")
         // Mức giảm đã lưu của MỌI game: nếu bấm Chơi ở một game khác với game đã lưu mức giảm thì sẽ không có gì được hạ
-        val saved = gs.sp.all.keys.filter { it.startsWith("res_") }.sortedBy { it }.joinToString("; ") { "${it.removePrefix("res_")}=${gs.sp.getInt(it, 100)}% (cách ${if (gs.sp.getInt("texm_" + it.removePrefix("res_"), 0) == 0) "cả màn hình" else "Game Mode"})" }
+        val saved = gs.sp.all.keys.filter { it.startsWith("res_") }.sortedBy { it }.joinToString("; ") { "${it.removePrefix("res_")}=${gs.sp.getInt(it, 100)}%" }
         line("mức giảm đã lưu của từng game: ${saved.ifEmpty { "(chưa game nào)" }}")
         line("app đang giữ hạ=${gs.sp.getBoolean("wm_on", false)} · gốc=${gs.sp.getString("wm_o", "")} · mục tiêu=${gs.sp.getString("wm_t", "")}")
         line("nhật ký (cũ -> mới):")
