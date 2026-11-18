@@ -199,9 +199,9 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun g(k: String, d: Int): Int { cfg["${k}_$sel"]; return sp.getInt("${k}_$sel", d) }
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
     fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
-    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm").forEach { unset(it) } }
+    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm", "rnd").forEach { unset(it) } }
     fun custom(p: String): Boolean =
-        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
+        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm", "rnd").any { sp.contains("${it}_$p") }
 
     val profiles = mutableStateListOf<Prof>().apply {
         runCatching {
@@ -218,7 +218,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         sp.edit().putString("profiles", a.toString()).apply()
     }
     fun addProfile() {
-        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texl" to 0, "texd" to 0, "texb" to 0, "texm" to 0)
+        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texl" to 0, "texd" to 0, "texb" to 0, "texm" to 0, "rnd" to 0)
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
         profiles.add(0, Prof("$selName · $stamp", sel, keys.mapValues { (k, d) -> g(k, d) }))
         saveProfiles()
@@ -338,19 +338,26 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
             }
             Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
             // Kết cấu thật (ANGLE): chỉ có hiệu lực khi game khởi động lại, nên báo nếu game đang chạy sẵn
+            val running = Rt.sh("pidof $p").any { it.trim().isNotEmpty() }
             val tl = g("texl", 0); val th = g("texd", 0) > 0; val ts = g("texb", 0) == 1
             if (tl > 0 || th || ts) {
-                val running = Rt.sh("pidof $p").any { it.trim().isNotEmpty() }
                 toast(Angle.apply(sp, p, tl, th, ts))
                 if (Angle.lastOk && running) toast("Game đang chạy sẵn: hãy đóng hẳn game rồi bấm Chơi lại để kết cấu có hiệu lực")
                 if (Angle.lastOk) thread { Thread.sleep(20000); Angle.check(sp, p) }
             }
             sp.edit().putLong("sess_t", System.currentTimeMillis()).apply()
+            // Cách game render: game Unity nhận tham số khởi động qua extra "unity". Chỉ có tác dụng khi game khởi động mới.
+            val rnd = g("rnd", 0)
+            if (rnd > 0) {
+                Wm.log(sp, "Chọn cách render: ${if (rnd == 1) "OpenGL ES" else "Vulkan"} (tham số ${Render.arg(rnd)})${if (running) " · game đang chạy sẵn nên chưa có hiệu lực" else ""}")
+                if (running) toast("Game đang chạy sẵn: hãy đóng hẳn game rồi bấm Chơi lại để đổi cách render")
+            }
+            if (!running || rnd > 0) thread { Thread.sleep(25000); Render.measure(sp, p, rnd) { toast(it) } }
             if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {
                 // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và khôi phục khi game thoát; ui=false thì không vẽ nút nổi
                 ctx.startForegroundService(Intent(ctx, Overlay::class.java).putExtra("ui", withOverlay))
-                pm.getLaunchIntentForPackage(p)?.let { ctx.startActivity(it) }
+                pm.getLaunchIntentForPackage(p)?.let { if (rnd > 0 && !running) it.putExtra("unity", Render.arg(rnd)); ctx.startActivity(it) }
             }
         }
     }

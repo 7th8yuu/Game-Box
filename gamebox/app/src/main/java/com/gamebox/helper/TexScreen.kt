@@ -53,6 +53,7 @@ fun TexScreen(gs: Gs) {
     // Hệ số thu nhỏ của từng mức trong bản xem trước (cảnh mẫu chỉ 320 px nên hiệu ứng được phóng đại cho dễ thấy)
     val fracs = listOf(1f, 1f / 3, 1f / 6, 1f / 10, 1f / 16)
     var lvl by remember { mutableIntStateOf(gs.g("texl", 0).coerceIn(0, 4)) }
+    var rnd by remember { mutableIntStateOf(gs.g("rnd", 0).coerceIn(0, 2)) }
     var resv by remember { mutableIntStateOf(gs.g("res", 100).coerceIn(30, 100)) }
     var on by remember { mutableStateOf(true) }
     var hard by remember { mutableStateOf(gs.g("texd", 0) > 0) }
@@ -162,12 +163,16 @@ fun TexScreen(gs: Gs) {
                 GSlider(resv.toFloat(), 30f..100f, steps = 13, mod = Modifier.fillMaxWidth()) { resv = (it / 5).roundToInt() * 5 }
                 Text(if (resv >= 95) "Giữ nguyên độ phân giải của máy" else "Game sẽ chạy ở khoảng ${big * resv / 100}×${small * resv / 100} thay vì $big×$small", fontSize = 13.sp, color = Cy, fontWeight = FontWeight.Medium)
                 Text("Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn; kích thước chữ và nút trong game không đổi. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải.", fontSize = 12.sp, color = Color.White.copy(.65f))
+                Lbl("CÁCH GAME RENDER")
+                Seg(Render.names, rnd, Modifier.fillMaxWidth()) { rnd = it }
+                Text(Render.seenText(gs.sp, gs.sel), fontSize = 12.sp, color = Cy, fontWeight = FontWeight.Medium)
+                Text("Ép game Unity (như Free Fire) dùng OpenGL ES hoặc Vulkan bằng tham số khởi động chính thức của Unity, không đụng vào bên trong game. Phải đóng hẳn game rồi bấm Chơi từ Game Box; nếu game không nhận lệnh, app sẽ báo sau khi game mở. OpenGL ES cần cho kết cấu qua ANGLE.", fontSize = 12.sp, color = Color.White.copy(.65f))
                 Text("Áp dụng thật khi bạn bấm Chơi trong app này. Game mở ngoài app vẫn chạy bình thường. Đổi khi đang chơi thì đóng game rồi mở lại.", fontSize = 12.sp, color = Color.White.copy(.65f))
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GhostBtn("Đặt lại gốc", icon = Ic.Reset) { lvl = 0; hard = false; edge = false; resv = 100 }
+                    GhostBtn("Đặt lại gốc", icon = Ic.Reset) { lvl = 0; hard = false; edge = false; resv = 100; rnd = 0 }
                     PrimaryBtn("Lưu", Modifier.weight(1f), icon = Ic.Save) {
-                        gs.s("res", if (on) resv else 100); gs.s("texl", if (on) lvl else 0); gs.s("texm", 0); gs.s("texd", if (on && hard) 60 else 0); gs.s("texb", if (on && edge) 1 else 0); gs.tex = false
+                        gs.s("res", if (on) resv else 100); gs.s("texl", if (on) lvl else 0); gs.s("rnd", if (on) rnd else 0); gs.s("texm", 0); gs.s("texd", if (on && hard) 60 else 0); gs.s("texb", if (on && edge) 1 else 0); gs.tex = false
                     }
                 }
             }

@@ -36,6 +36,27 @@ object GfxLab {
     private val pkgRx = Regex("[A-Za-z0-9_.]+")
     private fun one(cmd: String): String = Rt.sh(cmd).joinToString(" ") { it.trim() }.trim()
 
+    // Kết quả dò thư viện đồ họa game đã nạp. api: "vulkan" | "gles" | "?" (không đọc được / game chưa chạy)
+    class Seen(val running: Boolean, val readable: Boolean, val api: String, val note: String, val angle: Boolean, val libs: List<String>)
+
+    // Đọc /proc/<pid>/maps của game (cần root). Driver Vulkan của máy (vulkan.<chip>.so...) đã nạp = game đang vẽ bằng Vulkan;
+    // chỉ có libvulkan.so chung thì có thể game chỉ dò Vulkan.
+    fun detect(pkg: String): Seen {
+        if (!pkgRx.matches(pkg)) return Seen(false, false, "?", "chưa chọn game", false, emptyList())
+        val pid = one("pidof $pkg").split(" ").firstOrNull().orEmpty()
+        if (pid.isEmpty()) return Seen(false, false, "?", "game chưa chạy", false, emptyList())
+        val libs = Rt.sh("grep -o -E '[A-Za-z0-9_.-]*(vulkan|GLES|EGL|angle)[A-Za-z0-9_.-]*\\.so' /proc/$pid/maps | sort -u | head -n 16").map { it.trim() }.filter { it.isNotEmpty() }
+        if (libs.isEmpty()) return Seen(true, false, "?", "không đọc được /proc/$pid/maps (cần quyền root; Shizuku chế độ adb không đọc được)", false, libs)
+        val angle = libs.any { it.contains("angle", true) }
+        val vkLoader = libs.any { it == "libvulkan.so" }
+        val vkDriver = libs.any { it != "libvulkan.so" && it.contains("vulkan", true) }
+        return when {
+            vkDriver -> Seen(true, true, "vulkan", "Vulkan (đã nạp driver Vulkan của máy, nhiều khả năng game vẽ bằng Vulkan)", angle, libs)
+            vkLoader -> Seen(true, true, "gles", "OpenGL ES (chỉ nạp thư viện Vulkan chung, có thể game chỉ dò Vulkan)", angle, libs)
+            else -> Seen(true, true, "gles", "OpenGL ES (không thấy Vulkan)", angle, libs)
+        }
+    }
+
     fun run(sp: SharedPreferences, pkg: String, screenTest: Boolean, progress: (String) -> Unit): List<Row> {
         val rows = ArrayList<Row>()
         fun add(tag: String, name: String, d: String) { rows.add(Row(tag, name, d)) }
@@ -57,24 +78,14 @@ object GfxLab {
             val flags = one("dumpsys package $pkg | grep -m3 -E 'flags=|reqGlEsVersion|targetSdk='")
             appDebug = flags.contains("DEBUGGABLE")
             add("i", "Game $pkg", (flags.ifEmpty { "không đọc được thông tin gói" }) + " -> " + if (appDebug) "game là bản debug" else "game KHÔNG phải bản debug")
-            val pid = one("pidof $pkg").split(" ").firstOrNull().orEmpty()
-            if (pid.isEmpty()) add("i", "Game dùng đồ họa gì", "Game chưa chạy. Mở game từ Game Box, ở lại trong game vài giây rồi mở Phòng thử và chạy lại để biết game nạp OpenGL ES hay Vulkan.")
-            else {
-                progress("Xem thư viện đồ họa game đã nạp...")
-                val libs = Rt.sh("grep -o -E '[A-Za-z0-9_.-]*(vulkan|GLES|EGL|angle)[A-Za-z0-9_.-]*\\.so' /proc/$pid/maps | sort -u | head -n 16").map { it.trim() }.filter { it.isNotEmpty() }
-                if (libs.isEmpty()) add("KHÔNG", "Game dùng đồ họa gì", "Không đọc được /proc/$pid/maps (cần quyền root; Shizuku chế độ adb không đọc được).")
-                else {
-                    angleLoaded = libs.any { it.contains("angle", true) }
-                    val vkLoader = libs.any { it == "libvulkan.so" }
-                    val vkDriver = libs.any { it != "libvulkan.so" && it.contains("vulkan", true) }
-                    vkUsed = vkDriver
-                    val api = when {
-                        vkDriver -> "Vulkan (đã nạp driver Vulkan của máy, nhiều khả năng game vẽ bằng Vulkan)"
-                        vkLoader -> "OpenGL ES (chỉ nạp thư viện Vulkan chung, có thể game chỉ dò Vulkan)"
-                        else -> "OpenGL ES (không thấy Vulkan)"
-                    }
-                    add("i", "Game dùng đồ họa gì", "$api · ANGLE: ${if (angleLoaded) "đang nạp" else "không"} · thư viện: ${libs.joinToString(" ")}")
-                }
+            progress("Xem thư viện đồ họa game đã nạp...")
+            val d = detect(pkg)
+            angleLoaded = d.angle
+            vkUsed = d.api == "vulkan"
+            when {
+                !d.running -> add("i", "Game dùng đồ họa gì", "Game chưa chạy. Mở game từ Game Box, ở lại trong game vài giây rồi mở Phòng thử và chạy lại để biết game nạp OpenGL ES hay Vulkan.")
+                !d.readable -> add("KHÔNG", "Game dùng đồ họa gì", d.note)
+                else -> add("i", "Game dùng đồ họa gì", "${d.note} · ANGLE: ${if (d.angle) "đang nạp" else "không"} · thư viện: ${d.libs.joinToString(" ")}")
             }
         }
 

@@ -82,7 +82,7 @@ class HubActivity : ComponentActivity() {
         if (dbg && intent.getBooleanExtra("gfx", false)) g.gfxOpen = true
         // Chỉ bản debug: CI mô phỏng người dùng chọn game, đặt mức giảm độ phân giải rồi bấm Chơi
         intent.getStringExtra("play")?.takeIf { dbg }?.let { pkg ->
-            g.select(pkg); g.s("res", intent.getIntExtra("res", 60)); g.s("texm", 0); g.s("texl", intent.getIntExtra("texl", 0)); g.s("texd", intent.getIntExtra("texd", 0)); g.s("texb", intent.getIntExtra("texb", 0))
+            g.select(pkg); g.s("res", intent.getIntExtra("res", 60)); g.s("texm", 0); g.s("texl", intent.getIntExtra("texl", 0)); g.s("texd", intent.getIntExtra("texd", 0)); g.s("texb", intent.getIntExtra("texb", 0)); g.s("rnd", intent.getIntExtra("rnd", 0))
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ g.play() }, 2500)
         }
         setContent { HubApp(g, tab0, opt0, act0) }

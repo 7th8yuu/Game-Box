@@ -15,7 +15,7 @@ SRV=$!
 sleep 3
 echo "E2E ban đầu: $(wmstate) · ảnh chụp $(dims)"
 adb logcat -c
-adb shell am start -S -W -n $P/.HubActivity --es play $GAME --ei res 60 >/dev/null
+adb shell am start -S -W -n $P/.HubActivity --es play $GAME --ei res 60 --ei rnd 2 >/dev/null
 sleep 18
 echo "E2E sau Chơi: $(wmstate) · ảnh chụp $(dims)"
 echo "E2E tiến trình game: $(adb shell pidof $GAME | tr -d '\r')"
