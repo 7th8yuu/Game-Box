@@ -139,10 +139,10 @@ fun TexScreen(gs: Gs) {
                 val pw = big * levels[lvl] / 100; val ph = small * levels[lvl] / 100
                 Text("Game sẽ chạy ở khoảng $pw×$ph thay vì $big×$small (${levels[lvl]}%)", fontSize = 13.sp, color = Cy, fontWeight = FontWeight.Medium)
                 Lbl("CÁCH ÁP DỤNG")
-                Seg(listOf("Cả màn hình", "Chỉ game"), meth, Modifier.fillMaxWidth()) { meth = it }
+                Seg(listOf("Cả màn hình", "Chỉ game (thử)"), meth, Modifier.fillMaxWidth()) { meth = it }
                 Text(
                     if (meth == 0) "Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải."
-                    else "Dùng Game Mode của Android: chỉ riêng game bị hạ, nhưng game hoặc máy không hỗ trợ thì không có tác dụng.",
+                    else "Thử dùng Game Mode của Android để chỉ riêng game bị hạ. Nhiều game và máy không nhận; khi đó app tự chuyển sang hạ cả màn hình.",
                     fontSize = 12.sp, color = Color.White.copy(.65f)
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {

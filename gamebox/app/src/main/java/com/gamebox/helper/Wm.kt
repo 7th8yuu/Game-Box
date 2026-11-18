@@ -27,11 +27,26 @@ object Wm {
         return if (pw > 0 && ph > 0 && pd > 0) Info(pw, ph, pd, ow, oh, od) else null
     }
 
-    // Kích thước và mật độ mới cho tỉ lệ pct (%), luôn tính từ kích thước vật lý để áp lại không bị giảm chồng
-    fun target(i: Info, pct: Int): Triple<Int, Int, Int> {
+    // Cơ sở để tính mức giảm: giá trị đang dùng của máy (kể cả khi người dùng tự chỉnh mật độ, ví dụ 230) để kích thước dp
+    // trong game không đổi. Nếu app đã hạ rồi mà chưa trả lại (wm_on) thì dùng giá trị gốc đã lưu, tránh giảm chồng.
+    private fun base(sp: SharedPreferences?, i: Info): Triple<Int, Int, Int> {
+        var ow = i.ow; var oh = i.oh; var od = i.od
+        if (sp != null && sp.getBoolean("wm_on", false)) {
+            val o = (sp.getString("wm_o", "0x0|0") ?: "0x0|0").split("|")
+            val z = o.getOrElse(0) { "0x0" }.split("x")
+            ow = z.getOrNull(0)?.toIntOrNull() ?: 0; oh = z.getOrNull(1)?.toIntOrNull() ?: 0
+            od = o.getOrElse(1) { "0" }.toIntOrNull() ?: 0
+        }
+        val sized = ow > 0 && oh > 0
+        return Triple(if (sized) ow else i.pw, if (sized) oh else i.ph, if (od > 0) od else i.pd)
+    }
+
+    // Kích thước và mật độ mới cho tỉ lệ pct (%), tính từ cơ sở ở trên
+    fun target(i: Info, pct: Int, sp: SharedPreferences? = null): Triple<Int, Int, Int> {
         val s = pct.coerceIn(30, 95) / 100.0
+        val (bw, bh, bd) = base(sp, i)
         fun even(v: Double) = (Math.round(v / 2.0) * 2).toInt()
-        return Triple(even(i.pw * s).coerceAtLeast(240), even(i.ph * s).coerceAtLeast(320), Math.round(i.pd * s).toInt().coerceAtLeast(72))
+        return Triple(even(bw * s).coerceAtLeast(240), even(bh * s).coerceAtLeast(320), Math.round(bd * s).toInt().coerceAtLeast(72))
     }
 
     fun log(sp: SharedPreferences, msg: String) {
@@ -57,11 +72,11 @@ object Wm {
         if (pct >= 95) return false
         if (Rt.backend == "none") return fail(sp, "chưa có quyền Root/Shizuku")
         val i = read() ?: return fail(sp, "không đọc được kích thước màn hình (wm size)${Rt.lastErr.let { if (it.isEmpty()) "" else " · $it" }}")
+        val (w, h, d) = target(i, pct, sp)
         if (!sp.getBoolean("wm_on", false)) {
             // Lưu giá trị gốc (0x0 / 0 = mặc định của máy) trước khi đổi lần đầu
             sp.edit().putBoolean("wm_on", true).putString("wm_o", "${i.ow}x${i.oh}|${i.od}").apply()
         }
-        val (w, h, d) = target(i, pct)
         Rt.sh("wm size ${w}x$h", "wm density $d")
         // Đọc lại để biết lệnh có thật sự có hiệu lực (một số máy từ chối âm thầm hoặc áp chậm nên thử hai lần)
         var j: Info? = null
@@ -72,7 +87,7 @@ object Wm {
             ok = j != null && j.ow == w && j.oh == h
             if (ok) break
         }
-        log(sp, "áp $pct%: ${i.pw}x${i.ph}/${i.pd} -> ${w}x$h/$d, đọc lại ${j?.let { "${it.ow}x${it.oh}/${it.od}" } ?: "lỗi"} ${if (ok) "ĐÚNG" else "KHÔNG KHỚP"}")
+        log(sp, "áp $pct%: máy ${i.pw}x${i.ph}/${i.pd}${if (i.ow > 0 || i.od > 0) " (đang chỉnh ${if (i.ow > 0) "${i.ow}x${i.oh}" else "-"}/${if (i.od > 0) i.od else "-"})" else ""} -> ${w}x$h/$d, đọc lại ${j?.let { "${it.ow}x${it.oh}/${it.od}" } ?: "lỗi"} ${if (ok) "ĐÚNG" else "KHÔNG KHỚP"}")
         if (ok) {
             sp.edit().putString("wm_t", "${w}×$h").apply()
             lastMsg = "Đã hạ độ phân giải xuống ${w}×$h ($pct%)"

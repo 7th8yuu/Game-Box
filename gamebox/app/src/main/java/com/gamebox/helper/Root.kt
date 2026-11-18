@@ -129,21 +129,28 @@ object Rt {
     // gm 0 chuẩn, 1 hiệu năng, 2 tiết kiệm. res % (chỉ dùng cho cách "Chỉ game"), fps 0 = tối đa, hz 0 = mặc định, sat 1.0 = gốc.
     // Kiểm thử trên Android 14: "--fps disable" bị từ chối (NumberFormatException) nên chỉ truyền tham số khi thật sự cần;
     // "set --mode" đòi số; game phải ở chế độ đó mới có hiệu lực và game không hỗ trợ thì lệnh "mode" báo "not supported".
-    fun applyGame(p: String, gm: Int, res: Int, fps: Int, hz: Int, sat: Float) {
+    // Trả về false nếu Android báo rõ game không hỗ trợ cấu hình yêu cầu (để gọi cách khác); true nếu không thấy lỗi
+    fun applyGame(p: String, gm: Int, res: Int, fps: Int, hz: Int, sat: Float): Boolean {
         var args = ""
+        var ok = true
         if (res < 95) args += String.format(Locale.US, " --downscale %.2f", (res.coerceIn(30, 90) / 5 * 5) / 100.0)
         if (fps in listOf(30, 45, 60, 90, 120)) args += " --fps $fps"
+        fun bad(r: List<String>) = r.any { l -> listOf("not supported", "exception", "error", "unknown").any { l.contains(it, true) } }
         // Cấu hình ghi đè (độ phân giải, FPS) chỉ dùng được ở chế độ khác Chuẩn, nên Chuẩn mà có yêu cầu thì dùng Hiệu năng
         val m = if (gm == 0 && args.isNotEmpty()) 1 else gm
         if (m != 0) {
             val name = arrayOf("standard", "performance", "battery")[m]
-            if (args.isNotEmpty()) sh("cmd game set --mode ${m + 1}$args $p")
+            val r0 = if (args.isNotEmpty()) sh("cmd game set --mode ${m + 1}$args $p") else emptyList()
             val r = sh("cmd game mode $name $p")
+            ok = !bad(r0) && !bad(r)
             // Game chưa khai báo chế độ này: thử chế độ tùy chỉnh (custom) của Android 14+
-            if (args.isNotEmpty() && r.any { it.contains("not supported", true) }) sh("cmd game set$args $p", "cmd game mode custom $p")
+            if (args.isNotEmpty() && r.any { it.contains("not supported", true) }) {
+                ok = !bad(sh("cmd game set$args $p", "cmd game mode custom $p"))
+            }
         }
         if (hz > 0) sh("settings put system peak_refresh_rate $hz", "settings put system min_refresh_rate $hz")
         if (sat != 1f) sh("service call SurfaceFlinger 1022 f $sat")
+        return ok
     }
 
     fun restore(p: String) {

@@ -16,6 +16,19 @@ object FpsCli {
     fun main(a: Array<String>) {
         val pkg = a.getOrNull(0) ?: "com.gamebox.helper"
         val n = a.getOrNull(1)?.toIntOrNull() ?: 8
+        // Mẫu "--list" đúng định dạng Android 15 lấy từ máy thật (Samsung SM-A055F): tên layer nằm trong RequestedLayerState{...}
+        val sample = listOf(
+            "RequestedLayerState{f50362f ActivityRecordInputSink com.dts.freefireth/.FFMainActivity#84796 parentId=84789 z=-2147483648}",
+            "RequestedLayerState{Background for SurfaceView[com.dts.freefireth/com.dts.freefireth.FFMainActivity]#84949 parentId=84940 z=-2147483648}",
+            "RequestedLayerState{SurfaceView[com.dts.freefireth/com.dts.freefireth.FFMainActivity](BLAST)#84950 parentId=84940 z=-1}",
+            "com.other/Main#1"
+        )
+        val names = FpsParse.layerNames(sample, "com.dts.freefireth")
+        val okNames = names == listOf(
+            "SurfaceView[com.dts.freefireth/com.dts.freefireth.FFMainActivity](BLAST)#84950",
+            "f50362f ActivityRecordInputSink com.dts.freefireth/.FFMainActivity#84796"
+        )
+        println("FPSCLI tự kiểm tra tên layer Android 15: ${if (okNames) "ĐÚNG" else "SAI $names"}")
         val m = FpsMeter { local("{\n$it\n} 2>/dev/null") }
         for (i in 0 until n) {
             val f = m.measure(pkg, System.nanoTime() / 1_000_000L)

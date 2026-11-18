@@ -12,6 +12,21 @@ class Layer(val name: String, val frames: Int, val fps: Int)
 object FpsParse {
     private val ws = Regex("\\s+")
 
+    // Android 15 in "--list" mỗi layer dạng "RequestedLayerState{<tên> parentId=.. z=..}"; --latency cần đúng <tên> đó.
+    // Bản cũ in thẳng tên. Trả về tên dùng được cho --latency.
+    fun norm(line: String): String {
+        val l = line.trim()
+        return if (l.startsWith("RequestedLayerState{")) l.removePrefix("RequestedLayerState{").substringBeforeLast(" parentId=").trim() else l
+    }
+
+    // Các layer của game từ kết quả --list: bỏ layer nền/viền, ưu tiên layer vẽ khung (SurfaceView/BLAST), tối đa n
+    fun layerNames(list: List<String>, pkg: String, n: Int = 10): List<String> =
+        list.filter { it.contains(pkg) }.map { norm(it) }
+            .filter { it.isNotEmpty() && !it.startsWith("Background for") && !it.startsWith("Bounds for") }
+            .distinct()
+            .sortedByDescending { if (it.contains("SurfaceView") || it.contains("BLAST")) 1 else 0 }
+            .take(n)
+
     // Đầu vào: các khối "@@<tên layer>", sau đó là dòng chu kỳ làm mới (1 số) rồi các dòng "desired actual ready" (ns).
     // Cột 2 = lúc hiển thị thật; khung chưa hiển thị có giá trị rất lớn (Long.MAX) nên bị bỏ.
     // Layer không có khung mới suốt hơn 2 giây (game tạm dừng) tính là 0. seen nhớ khung cuối của từng layer.
@@ -98,20 +113,21 @@ class FpsMeter(private val run: (String) -> List<String>) {
     fun measure(pkg: String, now: Long): Int {
         if (pkg.isBlank()) return -1
         // Quét danh sách layer lúc đầu, định kỳ, hoặc khi layer cũ ngừng có khung (game đổi cảnh/layer)
-        val scan = layer.isEmpty() || now >= scanAt || zero >= 3
-        val s = StringBuilder()
-        if (scan) {
-            s.append("dumpsys SurfaceFlinger --list | grep -F ${q(pkg)} | grep -v -e '^Background for' -e '^Bounds for' | head -n 10 | ")
-            s.append("while IFS= read -r L; do echo \"@@\$L\"; dumpsys SurfaceFlinger --latency \"\$L\"; done\n")
-        } else {
-            s.append("echo ${q("@@$layer")}; dumpsys SurfaceFlinger --latency ${q(layer)}\n")
+        // (Chưa thấy layer nào mà cũng chưa có số liệu timestats thì quét mỗi lần, chờ game hiện lên)
+        val scan = now >= scanAt || zero >= 3 || (layer.isEmpty() && !tsOn)
+        val names: List<String> = when {
+            scan -> FpsParse.layerNames(run("dumpsys SurfaceFlinger --list | grep -F ${q(pkg)} | head -n 60"), pkg)
+            layer.isNotEmpty() -> listOf(layer)
+            else -> emptyList()
         }
+        val s = StringBuilder()
+        for (n in names) s.append("echo ${q("@@$n")}; dumpsys SurfaceFlinger --latency ${q(n)}\n")
         if (scan || tsOn) {
             s.append("echo '##TS'\n")
             s.append("dumpsys SurfaceFlinger --timestats -enable >/dev/null 2>&1\n")
             s.append("dumpsys SurfaceFlinger --timestats -dump 2>/dev/null | grep -F -e layerName -e totalFrames\n")
         }
-        val out = run(s.toString())
+        val out = if (s.isEmpty()) emptyList() else run(s.toString())
         val i = out.indexOfFirst { it.trim() == "##TS" }
         val lat = if (i >= 0) out.subList(0, i) else out
         val tsl = if (i >= 0) out.subList(i + 1, out.size) else emptyList()
@@ -123,6 +139,7 @@ class FpsMeter(private val run: (String) -> List<String>) {
             val pick = if (latF > 0) bestLat else layers.maxByOrNull { it.frames }
             layer = pick?.name ?: ""
             scanAt = now + 15_000L
+            zero = 0
         }
 
         // Cách 2: tốc độ tăng của totalFrames từng layer thuộc game (lấy layer cao nhất, tránh cộng đôi layer cửa sổ + SurfaceView)

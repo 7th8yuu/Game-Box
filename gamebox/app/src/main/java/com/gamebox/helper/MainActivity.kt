@@ -192,12 +192,15 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
 
     companion object { @Volatile private var checked = false }
 
-    fun g(k: String, d: Int) = cfg["${k}_$sel"] ?: sp.getInt("${k}_$sel", d)
+    // Luôn đọc từ SharedPreferences (dùng chung cho mọi Activity). Trước đây ưu tiên bộ nhớ đệm cfg của riêng từng Gs, nên giá trị
+    // lưu ở màn hình này không tới được Gs của màn hình kia (ví dụ lưu mức giảm ở Game Space, bấm Chơi ở Trang chủ vẫn đọc giá trị cũ).
+    // cfg chỉ còn để Compose biết khi nào cần vẽ lại.
+    fun g(k: String, d: Int): Int { cfg["${k}_$sel"]; return sp.getInt("${k}_$sel", d) }
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
     fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
     fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").forEach { unset(it) } }
     fun custom(p: String): Boolean =
-        cfg.keys.any { it.endsWith("_$p") } || listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
+        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
 
     val profiles = mutableStateListOf<Prof>().apply {
         runCatching {
@@ -320,16 +323,23 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         val an = g("anim", 0); val ms = g("msaa", 0) == 1; val dv = g("drv", 0)
         val screenWide = g("texm", 0) == 0
         thread {
+            // Nhật ký quyết định (hiện trong Chẩn đoán) để biết vì sao có hoặc không hạ độ phân giải
+            Wm.log(sp, "Chơi $p: mức $res% · cách ${if (screenWide) "cả màn hình" else "Game Mode"}${if (res >= 95) " · không giảm" else ""}")
+            fun toast(msg: String) { if (msg.isNotEmpty()) Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() } }
             // Cách "Cả màn hình": hạ wm size trước khi mở game để game khởi động đã ở độ phân giải mới.
             // Nếu không đổi được thì rơi về Game Mode.
             var gmRes = res
             if (res < 95 && screenWide) {
                 if (Wm.apply(sp, res)) { gmRes = 100; Thread.sleep(700) }
                 // Báo ngay kết quả (hiện được cả khi game đã mở) để biết độ phân giải có thật sự bị hạ không
-                val msg = Wm.lastMsg
-                if (msg.isNotEmpty()) Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
+                toast(Wm.lastMsg)
             }
-            Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
+            val gmOk = Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
+            // Chọn "Chỉ game" mà game không nhận Game Mode thì hạ cả màn hình để vẫn có tác dụng
+            if (res < 95 && !screenWide && !gmOk) {
+                Wm.log(sp, "Game không nhận Game Mode, chuyển sang hạ cả màn hình")
+                if (Wm.apply(sp, res)) { Thread.sleep(700); toast("Game không nhận Game Mode nên đã hạ độ phân giải cả màn hình") } else toast(Wm.lastMsg)
+            }
             if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {
                 // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và khôi phục khi game thoát; ui=false thì không vẽ nút nổi
