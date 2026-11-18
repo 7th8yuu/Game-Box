@@ -101,6 +101,7 @@ object Wm {
 
     // Trả lại độ phân giải gốc nếu app đã đổi nó. Không có quyền thì giữ cờ để lần sau thử lại
     fun restore(sp: SharedPreferences, why: String = "") {
+        Angle.restore(sp, why) // kết cấu thật (ANGLE) cùng vòng đời với phiên chơi nên trả lại cùng lúc
         if (!sp.getBoolean("wm_on", false) || Rt.backend == "none") return
         val o = (sp.getString("wm_o", "0x0|0") ?: "0x0|0").split("|")
         val sz = o.getOrElse(0) { "0x0" }; val dn = o.getOrElse(1) { "0" }
@@ -142,6 +143,7 @@ object Wm {
     // Nút khẩn cấp trong cài đặt: về mặc định của máy bất kể đang ở trạng thái nào
     fun forceReset(sp: SharedPreferences) {
         if (Rt.backend == "none") return
+        Angle.restore(sp, "nút khẩn cấp")
         Rt.sh("wm size reset", "wm density reset")
         log(sp, "khôi phục: nút khẩn cấp")
         sp.edit().remove("wm_on").remove("wm_o").remove("wm_t").apply()

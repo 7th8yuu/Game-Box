@@ -93,3 +93,24 @@ object WmCli {
         println("WMCLI cờ sau selftest: wm_on=${sp.getBoolean("wm_on", false)}")
     }
 }
+
+// Thử cơ chế "kết cấu thật" (Angle.kt) bằng quyền shell thật: dò máy, đặt, đọc lại, trả về đúng giá trị gốc.
+// Emulator thường không có gói ANGLE hệ thống nên apply thường bị từ chối; bản force bỏ qua kiểm tra đó để thử riêng phần đặt/trả lại.
+object AngleCli {
+    @JvmStatic
+    fun main(a: Array<String>) {
+        Rt.backend = "shizuku"
+        Rt.exec = { local(it) }
+        val sp = MemPrefs()
+        println("ANGLECLI dò máy: " + Angle.report(sp).lines().filter { it.isNotEmpty() }.joinToString(" ¦ "))
+        fun st() = Rt.sh("echo \"pkgs=\$(settings get global angle_gl_driver_selection_pkgs) vals=\$(settings get global angle_gl_driver_selection_values) prop=[\$(getprop debug.angle.feature_overrides_enabled)]\"").firstOrNull()
+        println("ANGLECLI chuỗi tính năng: mức3+hard=${Angle.features(3, true, false)} · mức0+sharp=${Angle.features(0, false, true)} · mức0=[${Angle.features(0, false, false)}]")
+        println("ANGLECLI trước: ${st()}")
+        println("ANGLECLI apply thường: \"${Angle.apply(sp, "com.gamebox.helper", 3, true, false)}\" lastOk=${Angle.lastOk} cờ=${sp.getBoolean("ang_on", false)}")
+        println("ANGLECLI apply force: \"${Angle.apply(sp, "com.gamebox.helper", 3, true, true, force = true)}\" lastOk=${Angle.lastOk} cờ=${sp.getBoolean("ang_on", false)}")
+        println("ANGLECLI giữa: ${st()}")
+        Angle.restore(sp, "thử nghiệm")
+        println("ANGLECLI sau khôi phục: ${st()} cờ=${sp.getBoolean("ang_on", false)}")
+        println("ANGLECLI nhật ký:"); Wm.logText(sp).lines().forEach { println("ANGLECLI   $it") }
+    }
+}

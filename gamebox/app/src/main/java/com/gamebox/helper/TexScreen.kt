@@ -43,21 +43,24 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// Màn hình Kết cấu: so sánh trước/sau trên cảnh mẫu, chọn mức giảm độ phân giải render.
-// Phần áp dụng thật là hạ độ phân giải màn hình trong phiên chơi (wm size, xem Wm.kt). Mờ theo độ xa và viền kết cấu chỉ là xem trước.
+// Màn hình Kết cấu: so sánh trước/sau trên cảnh mẫu (chỉ là mô phỏng), chọn mức kết cấu, Hard Distance Steps, Sharp Pixels và
+// độ phân giải màn hình. Kết cấu áp thật qua ANGLE khi máy hỗ trợ (xem Angle.kt), độ phân giải áp thật bằng wm size (xem Wm.kt).
 @Composable
 fun TexScreen(gs: Gs) {
     val icon = gs.icon(gs.sel)
     val name = gs.selName
-    val levels = listOf(100, 80, 60, 45, 30)
-    val names = listOf("Gốc", "Nhẹ", "Retro", "Khối", "Cực đại")
-    // Bản xem trước phóng đại (cảnh mẫu chỉ 320 px) để thấy rõ khác biệt; con số thật là levels
-    val fracs = listOf(1f, .5f, .25f, .125f, .0625f)
-    val res = gs.g("res", 100)
-    var lvl by remember { mutableIntStateOf(levels.indices.minByOrNull { abs(levels[it] - res) } ?: 0) }
+    val names = Angle.names
+    // Hệ số thu nhỏ của từng mức trong bản xem trước (cảnh mẫu chỉ 320 px nên hiệu ứng được phóng đại cho dễ thấy)
+    val fracs = listOf(1f, 1f / 3, 1f / 6, 1f / 10, 1f / 16)
+    var lvl by remember { mutableIntStateOf(gs.g("texl", 0).coerceIn(0, 4)) }
+    var resv by remember { mutableIntStateOf(gs.g("res", 100).coerceIn(30, 100)) }
     var on by remember { mutableStateOf(true) }
-    var dist by remember { mutableIntStateOf(gs.g("texd", 0)) }
+    var hard by remember { mutableStateOf(gs.g("texd", 0) > 0) }
+    val dist = if (hard) 60 else 0
     var edge by remember { mutableStateOf(gs.g("texb", 0) == 1) }
+    var pr by remember { mutableStateOf<Angle.Probe?>(null) }
+    var prTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(prTick) { pr = withContext(Dispatchers.IO) { Angle.probe(gs.sp) } }
     var info by remember { mutableStateOf<Triple<String, Int, Gpu.Game>?>(null) }
     LaunchedEffect(gs.sel) {
         info = withContext(Dispatchers.IO) { Gpu.detect(); Triple(Gpu.renderer, Gpu.tier(), Gpu.game(gs.ctx, gs.sel)) }
@@ -131,36 +134,38 @@ fun TexScreen(gs: Gs) {
                         SmallBtn("Tự động: gợi ý ${names[Gpu.suggest(t)]}") { lvl = Gpu.suggest(t) }
                     }
                 }
-                Lbl("CÀI NHANH")
+                Lbl("KẾT CẤU")
                 Seg(names, lvl, Modifier.fillMaxWidth()) { lvl = it }
+                val p = pr
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.06f)).padding(12.dp)) {
+                    when {
+                        p == null -> Text("Đang kiểm tra máy có hỗ trợ kết cấu thật không...", fontSize = 12.sp, color = Color.White.copy(.75f))
+                        p.ok -> Text("Máy này dùng được kết cấu thật (ANGLE). Áp khi bấm Chơi: game cần được mở lại từ Game Box. Chỉ có tác dụng với game OpenGL ES, game chạy Vulkan thuần sẽ không đổi.", fontSize = 12.sp, color = Cy)
+                        else -> {
+                            Text("Máy này chưa dùng được kết cấu thật: ${p.why()}.", fontSize = 12.sp, color = Warn)
+                            Text("Ảnh Trước/Sau chỉ là mô phỏng. Muốn nhẹ máy ngay thì dùng độ phân giải ở dưới, phần đó chạy được trên mọi máy có Shizuku hoặc root.", fontSize = 12.sp, color = Color.White.copy(.65f))
+                            if (p.bad) { Spacer(Modifier.height(6.dp)); SmallBtn("Cho phép thử lại") { Angle.clearBad(gs.sp); prTick++ } }
+                        }
+                    }
+                }
+                SwRow("Hard Distance Steps", "Chuyển chi tiết theo bậc theo khoảng cách, vật xa vỡ khối rõ hơn", hard) { hard = it }
+                SwRow("Sharp Pixels", "Lấy mẫu gần nhất: thấy rõ các ô vuông thay vì làm mờ mượt", edge) { edge = it }
+                Lbl("ĐỘ PHÂN GIẢI MÀN HÌNH")
                 val dm = gs.ctx.resources.displayMetrics
                 val big = maxOf(dm.widthPixels, dm.heightPixels); val small = minOf(dm.widthPixels, dm.heightPixels)
-                val pw = big * levels[lvl] / 100; val ph = small * levels[lvl] / 100
-                Text("Game sẽ chạy ở khoảng $pw×$ph thay vì $big×$small (${levels[lvl]}%)", fontSize = 13.sp, color = Cy, fontWeight = FontWeight.Medium)
-                Lbl("CÁCH ÁP DỤNG")
-                Text(
-                    "Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn; kích thước chữ và nút trong game không đổi. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải.",
-                    fontSize = 12.sp, color = Color.White.copy(.65f)
-                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Chi tiết kết cấu", Modifier.weight(1f), fontWeight = FontWeight.Medium)
-                    Text(names[lvl], color = Cy, fontWeight = FontWeight.Bold)
+                    Text("Độ phân giải trong lúc chơi", Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                    Text(if (resv >= 100) "Gốc" else "$resv%", color = Cy, fontWeight = FontWeight.Bold)
                 }
-                GSlider(lvl.toFloat(), 0f..4f, steps = 3, mod = Modifier.fillMaxWidth()) { lvl = it.roundToInt() }
-                Text("Độ phân giải render của game: ${levels[lvl]}%", fontSize = 13.sp, color = Color.White.copy(.8f))
+                GSlider(resv.toFloat(), 30f..100f, steps = 13, mod = Modifier.fillMaxWidth()) { resv = (it / 5).roundToInt() * 5 }
+                Text(if (resv >= 95) "Giữ nguyên độ phân giải của máy" else "Game sẽ chạy ở khoảng ${big * resv / 100}×${small * resv / 100} thay vì $big×$small", fontSize = 13.sp, color = Cy, fontWeight = FontWeight.Medium)
+                Text("Hạ độ phân giải màn hình (wm size) trong lúc chơi nên game nào cũng nhẹ GPU hơn; kích thước chữ và nút trong game không đổi. Tự trả lại khi thoát game; nếu bị kẹt, vào Cài đặt > Khôi phục độ phân giải.", fontSize = 12.sp, color = Color.White.copy(.65f))
                 Text("Áp dụng thật khi bạn bấm Chơi trong app này. Game mở ngoài app vẫn chạy bình thường. Đổi khi đang chơi thì đóng game rồi mở lại.", fontSize = 12.sp, color = Color.White.copy(.65f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Mờ theo độ xa (xem trước)", Modifier.weight(1f), fontWeight = FontWeight.Medium)
-                    Text(if (dist == 0) "Tắt" else "$dist%", color = Cy, fontWeight = FontWeight.Bold)
-                }
-                GSlider(dist.toFloat(), 0f..100f, mod = Modifier.fillMaxWidth()) { dist = it.roundToInt() }
-                SwRow("Viền kết cấu (xem trước)", "Bật thì thấy rõ các khối vuông, tắt thì mượt và khó nhận ra", edge) { edge = it }
-                Text("Mức độ phân giải là phần can thiệp được thật. Mờ theo độ xa và viền kết cấu cần can thiệp bộ lọc kết cấu bên trong game, Android không cho làm với game khác nên chỉ để so sánh hình ảnh.", fontSize = 11.sp, color = Color.White.copy(.5f))
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GhostBtn("Đặt lại gốc", icon = Ic.Reset) { lvl = 0; dist = 0; edge = false }
+                    GhostBtn("Đặt lại gốc", icon = Ic.Reset) { lvl = 0; hard = false; edge = false; resv = 100 }
                     PrimaryBtn("Lưu", Modifier.weight(1f), icon = Ic.Save) {
-                        gs.s("res", if (on) levels[lvl] else 100); gs.s("texm", 0); gs.s("texd", dist); gs.s("texb", if (edge) 1 else 0); gs.tex = false
+                        gs.s("res", if (on) resv else 100); gs.s("texl", if (on) lvl else 0); gs.s("texm", 0); gs.s("texd", if (on && hard) 60 else 0); gs.s("texb", if (on && edge) 1 else 0); gs.tex = false
                     }
                 }
             }

@@ -15,6 +15,9 @@ adb shell wm size reset; adb shell wm density reset; sleep 2
 echo "WMCLI_PROBE:"
 cli WmCli 60 | sed 's/^/  /'
 
+echo "ANGLECLI_PROBE:"
+cli AngleCli | sed 's/^/  /'
+
 echo "SIM_PROBE: game giả GLSurfaceView"
 adb shell am start -S -W -n $P/.SimActivity >/dev/null; sleep 5
 echo "SIM layers:"; adb shell "dumpsys SurfaceFlinger --list | grep -F $P"

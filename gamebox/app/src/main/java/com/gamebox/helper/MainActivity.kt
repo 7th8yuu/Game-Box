@@ -183,7 +183,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         if (!checked) {
             checked = true
             val pend = sp.getString("sess", "") ?: ""
-            if ((pend.isNotEmpty() || sp.getBoolean("wm_on", false)) && !Overlay.alive) {
+            if ((pend.isNotEmpty() || sp.getBoolean("wm_on", false) || sp.getBoolean("ang_on", false)) && !Overlay.alive) {
                 sp.edit().remove("sess").apply()
                 thread { Rt.init(); Rt.restore(pend); Wm.restore(sp, "app mở lại, còn phiên dang dở"); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
             }
@@ -198,9 +198,9 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     fun g(k: String, d: Int): Int { cfg["${k}_$sel"]; return sp.getInt("${k}_$sel", d) }
     fun s(k: String, v: Int) { cfg["${k}_$sel"] = v; sp.edit().putInt("${k}_$sel", v).apply() }
     fun unset(k: String) { sp.edit().remove("${k}_$sel").apply(); cfg.remove("${k}_$sel") }
-    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").forEach { unset(it) } }
+    fun reset() { listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm").forEach { unset(it) } }
     fun custom(p: String): Boolean =
-        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
+        listOf("hz", "sat", "res", "fps", "gm", "msaa", "drv", "anim", "texl", "texd", "texb", "texm").any { sp.contains("${it}_$p") }
 
     val profiles = mutableStateListOf<Prof>().apply {
         runCatching {
@@ -217,7 +217,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
         sp.edit().putString("profiles", a.toString()).apply()
     }
     fun addProfile() {
-        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texd" to 0, "texb" to 0, "texm" to 0)
+        val keys = mapOf("hz" to 0, "sat" to 100, "res" to 100, "fps" to 5, "gm" to 0, "msaa" to 0, "drv" to 0, "anim" to 0, "texl" to 0, "texd" to 0, "texb" to 0, "texm" to 0)
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
         profiles.add(0, Prof("$selName · $stamp", sel, keys.mapValues { (k, d) -> g(k, d) }))
         saveProfiles()
@@ -258,7 +258,7 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
     var wmT by mutableStateOf("") // kích thước đang áp, ví dụ 432×960
 
     fun sample() {
-        wmOn = sp.getBoolean("wm_on", false)
+        wmOn = sp.getBoolean("wm_on", false) || sp.getBoolean("ang_on", false)
         wmT = sp.getString("wm_t", "") ?: ""
         val x = Rt.stats(); st = x
         val (t, a) = Rt.mem(); total = t; used = t - a; ram = (100 - a * 100 / t).toInt()
@@ -336,6 +336,15 @@ class Gs(val ctx: Context, val sp: SharedPreferences) {
                 toast(Wm.lastMsg)
             }
             Rt.applyGame(p, gm, gmRes, fps, hzv, sat); Rt.mode(gm); Rt.anim(an); Rt.msaa(ms); Rt.driver(dv)
+            // Kết cấu thật (ANGLE): chỉ có hiệu lực khi game khởi động lại, nên báo nếu game đang chạy sẵn
+            val tl = g("texl", 0); val th = g("texd", 0) > 0; val ts = g("texb", 0) == 1
+            if (tl > 0 || th || ts) {
+                val running = Rt.sh("pidof $p").any { it.trim().isNotEmpty() }
+                toast(Angle.apply(sp, p, tl, th, ts))
+                if (Angle.lastOk && running) toast("Game đang chạy sẵn: hãy đóng hẳn game rồi bấm Chơi lại để kết cấu có hiệu lực")
+                if (Angle.lastOk) thread { Thread.sleep(20000); Angle.check(sp, p) }
+            }
+            sp.edit().putLong("sess_t", System.currentTimeMillis()).apply()
             if (fixed) Rt.fixed(true); if (dnd) Rt.dnd(true); if (cln) Rt.clean()
             Handler(Looper.getMainLooper()).post {
                 // Dịch vụ luôn chạy khi bấm Chơi để theo dõi game và khôi phục khi game thoát; ui=false thì không vẽ nút nổi

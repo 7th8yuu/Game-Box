@@ -588,6 +588,8 @@ class Overlay : Service() {
         val p = Rt.pkg.ifEmpty { sp.getString("sess", "") ?: "" }
         Rt.pkg = ""
         sp.edit().remove("sess").apply()
+        // Game tự thoát trong 25 giây đầu khi kết cấu thật đang bật: nghi do ANGLE, tạm tắt cho bản phần mềm này
+        if (why == "game đã đóng" && sp.getBoolean("ang_on", false) && System.currentTimeMillis() - sp.getLong("sess_t", 0L) < 25_000L) Angle.markBad(sp)
         thread { Rt.restore(p); Wm.restore(sp, "kết thúc phiên ($why)"); Rt.mode(0); Rt.dnd(false); Rt.fixed(false) }
         stopSelf()
     }

@@ -59,8 +59,8 @@ fun HomePage(gs: Gs, goProfile: () -> Unit) {
         // Độ phân giải đang bị hạ cho phiên chơi: cho khôi phục ngay nếu game đã thoát mà chưa tự trả lại
         AnimatedVisibility(gs.wmOn) {
             Panel(Modifier.fillMaxWidth().padding(bottom = 12.dp), pad = 14.dp, tint = Warn) {
-                Text(if (gs.wmT.isEmpty()) "Đang hạ độ phân giải để chơi game" else "Đang hạ độ phân giải xuống ${gs.wmT}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("Sẽ tự trả lại khi game thoát. Nếu đã thoát game mà màn hình còn nhỏ, bấm khôi phục.", fontSize = 12.sp, color = Dim)
+                Text(if (gs.wmT.isEmpty()) "Đang áp thay đổi cho phiên chơi" else "Đang hạ độ phân giải xuống ${gs.wmT}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("Sẽ tự trả lại khi game thoát. Nếu đã thoát game mà màn hình còn nhỏ hoặc game còn bị đổi kết cấu, bấm khôi phục.", fontSize = 12.sp, color = Dim)
                 Spacer(Modifier.height(8.dp))
                 GhostBtn("Khôi phục ngay", Modifier.fillMaxWidth(), icon = Ic.Reset) {
                     gs.wmOn = false
