@@ -63,8 +63,16 @@ fun HomePage(gs: Gs, goProfile: () -> Unit) {
                 Text("Sẽ tự trả lại khi game thoát. Nếu đã thoát game mà màn hình còn nhỏ hoặc game còn bị đổi kết cấu, bấm khôi phục.", fontSize = 12.sp, color = Dim)
                 Spacer(Modifier.height(8.dp))
                 GhostBtn("Khôi phục ngay", Modifier.fillMaxWidth(), icon = Ic.Reset) {
-                    gs.wmOn = false
                     kotlin.concurrent.thread {
+                        if (Rt.backend == "none") Rt.init()
+                        if (Rt.backend == "none") {
+                            // Không có quyền thì không trả lại được: giữ nguyên banner, đừng làm như đã xong
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                android.widget.Toast.makeText(ctx, "Chưa có quyền Root/Shizuku nên chưa trả lại được. Bật Shizuku rồi bấm lại. Hoặc dùng adb: wm size reset && wm density reset", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                            return@thread
+                        }
+                        gs.wmOn = false
                         val p = Rt.pkg.ifEmpty { gs.sp.getString("sess", "") ?: "" }
                         Wm.restore(gs.sp, "nút Khôi phục ngay"); Rt.restore(p); gs.sp.edit().remove("sess").apply()
                         ctx.stopService(Intent(ctx, Overlay::class.java))

@@ -27,6 +27,19 @@ sleep 14
 echo "E2E sau khi game thoát: $(wmstate)"
 echo "E2E cờ sau:"; adb shell "run-as $P cat shared_prefs/gs.xml" | grep -E 'wm_|sess' | sed 's/^/   /'
 echo "E2E máy chủ shell:"; head -n 5 /tmp/shellsrv.log | sed 's/^/   /'
+# Máy khởi động lại giữa phiên: hạ độ phân giải, giết app (không qua đường thoát bình thường), rồi gửi sự kiện khởi động
+echo "BOOT_PROBE: tắt máy giữa phiên rồi khởi động lại"
+adb shell am start -S -W -n $P/.HubActivity --es play $GAME --ei res 60 >/dev/null
+sleep 12
+adb shell am force-stop $P
+sleep 2
+echo "BOOT trước khi khởi động: $(wmstate)"
+echo "BOOT cờ trước:"; adb shell "run-as $P cat shared_prefs/gs.xml" | grep -E 'wm_on|wm_o"' | sed 's/^/   /'
+adb shell am broadcast -a com.gamebox.helper.RES_REVERT -n $P/.BootReceiver | tail -n 1 | sed 's/^/   /'
+sleep 8
+echo "BOOT sau khởi động: $(wmstate)"
+echo "BOOT cờ sau:"; adb shell "run-as $P cat shared_prefs/gs.xml" | grep -E 'wm_on|wm_log' | sed 's/^/   /'
+adb shell am force-stop $GAME
 kill $SRV >/dev/null 2>&1
 adb shell "pkill -f ShellServer" >/dev/null 2>&1
 adb shell wm size reset; adb shell wm density reset

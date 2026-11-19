@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
     <application android:name=".CrashApp" android:label="Game Box" android:theme="@android:style/Theme.Material.NoActionBar"
         android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
@@ -22,6 +23,13 @@
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|density|uiMode|fontScale|locale|layoutDirection|colorMode|navigation"/>
         <service android:name=".Overlay" android:exported="false"/>
+        <!-- Máy khởi động lại giữa phiên chơi: wm size/density vẫn còn hiệu lực sau khi khởi động nên cần trả lại -->
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="com.gamebox.helper.RES_REVERT"/>
+            </intent-filter>
+        </receiver>
         <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="${applicationId}.shizuku"
             android:multiprocess="false" android:enabled="true" android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
